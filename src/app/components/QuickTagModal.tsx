@@ -323,6 +323,8 @@ export function QuickTagModal({ tags: initialTags, onSave, onClose }: Props) {
   const [visFilter, setVisFilter] = useState<ShareVis|null>(null);
   const [selId, setSelId] = useState<string|null>(null);
   const [toast, setToast] = useState('');
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncSelectedIds, setSyncSelectedIds] = useState<Set<string>>(new Set());
 
   // Form state
   const [fName, setFName] = useState('');
@@ -414,6 +416,15 @@ export function QuickTagModal({ tags: initialTags, onSave, onClose }: Props) {
   const isMine = (t: QuickTag) => t.owner === ME;
   const selectedTag = selId ? tags.find(t => t.id === selId) : null;
   const isReadonly = selectedTag ? !isMine(selectedTag) : false;
+  const canSyncToOthers = !!selectedTag && !isNew && !isReadonly;
+  const myTags = React.useMemo(
+    () => tags.filter(t => isMine(t)),
+    [tags],
+  );
+  const syncTargetTags = React.useMemo(
+    () => myTags.filter(t => t.id !== selId),
+    [myTags, selId],
+  );
   const formatUpdateTime = (value?: string) => {
     if (!value) return '--';
     const d = new Date(value);
@@ -451,6 +462,40 @@ export function QuickTagModal({ tags: initialTags, onSave, onClose }: Props) {
       setSelId(newId); setIsNew(false);
     }
     showToast('保存成功');
+  };
+
+  const openSyncModal = () => {
+    setSyncSelectedIds(new Set());
+    setShowSyncModal(true);
+  };
+  const confirmSyncToOthers = () => {
+    if (!canSyncToOthers) { setShowSyncModal(false); return; }
+    const ids = Array.from(syncSelectedIds);
+    if (ids.length === 0) { setShowSyncModal(false); return; }
+
+    const nowIso = new Date().toISOString();
+    const srcMain = [...fMainCh];
+    const srcSub = [...fSubCh];
+    const srcColor = fColor;
+    const srcVis = fVis;
+    const srcAuth = [...fAuth];
+
+    setTags(prev => prev.map(t => {
+      if (!ids.includes(t.id)) return t;
+      const mainSet = new Set([...(t.mainChannels || []), ...srcMain]);
+      const subSet = new Set([...(t.subChannels || []), ...srcSub]);
+      return {
+        ...t,
+        color: srcColor,
+        vis: srcVis,
+        authUsers: srcAuth,
+        mainChannels: Array.from(mainSet),
+        subChannels: Array.from(subSet),
+        updatedAt: nowIso,
+      };
+    }));
+    setShowSyncModal(false);
+    showToast(`成功更新 ${ids.length} 个标签`);
   };
 
   const deleteTag = () => {
@@ -800,7 +845,25 @@ export function QuickTagModal({ tags: initialTags, onSave, onClose }: Props) {
                         保存当前标签配置
                       </button>
                     </div>
-                    {selId && !isNew && <div style={{ width:110 }} />}
+                    {canSyncToOthers ? (
+                      <button
+                        onClick={openSyncModal}
+                        style={{
+                          padding:'6px 16px',
+                          borderRadius:6,
+                          border:'1px solid #e0e0e0',
+                          background:'#fff',
+                          color:'#ff4d4f',
+                          fontSize:13,
+                          cursor:'pointer',
+                          whiteSpace:'nowrap',
+                        }}
+                      >
+                        同步追加至其他标签
+                      </button>
+                    ) : (
+                      <div style={{ width:140 }} />
+                    )}
                   </div>
                 )}
               </div>
@@ -936,6 +999,91 @@ export function QuickTagModal({ tags: initialTags, onSave, onClose }: Props) {
             <div style={{ padding:'12px 20px',borderTop:'1px solid #f0f0f0',display:'flex',justifyContent:'flex-end',gap:8,flexShrink:0 }}>
               <button onClick={() => setShowMemberModal(false)} style={{ padding:'6px 20px',border:'1px solid #e0e0e0',borderRadius:6,background:'#fff',fontSize:13,cursor:'pointer' }}>取消</button>
               <button onClick={confirmMembers} style={{ padding:'6px 20px',border:'none',borderRadius:6,background:'#1890ff',color:'#fff',fontSize:13,cursor:'pointer' }}>确认</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ SYNC MODAL ══ */}
+      {showSyncModal && (
+        <div
+          style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.25)', zIndex:100000, display:'flex', alignItems:'center', justifyContent:'center' }}
+          onMouseDown={e => { if (e.target === e.currentTarget) setShowSyncModal(false); }}
+        >
+          <div style={{ width:520, maxHeight:'90vh', background:'#fff', borderRadius:12, boxShadow:'0 8px 32px rgba(0,0,0,.15)', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+            <div style={{ padding:'16px 20px', borderBottom:'1px solid #f0f0f0', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
+              <div>
+                <span style={{ fontSize:15, fontWeight:600 }}>同步追加至其他标签</span>
+                <span style={{ fontSize:13, color:'#999', marginLeft:8 }}>从「{selectedTag?.label ?? ''}」同步</span>
+              </div>
+              <X size={14} color="#999" style={{ cursor:'pointer' }} onClick={() => setShowSyncModal(false)} />
+            </div>
+
+            <div style={{ padding:'14px 20px', borderBottom:'1px solid #f0f0f0', fontSize:12, color:'#999' }}>
+              仅支持选择「我」创建的其他标签，可多选。
+            </div>
+
+            <div style={{ flex:1, overflowY:'auto', padding:'12px 20px', minHeight:220 }}>
+              {syncTargetTags.length === 0 ? (
+                <div style={{ textAlign:'center', color:'#bbb', fontSize:13, padding:'40px 0' }}>暂无可同步的标签</div>
+              ) : (
+                <div style={{ border:'1px solid #e0e0e0', borderRadius:10, overflow:'hidden' }}>
+                  {syncTargetTags.map((t, i) => {
+                    const checked = syncSelectedIds.has(t.id);
+                    return (
+                      <div
+                        key={t.id}
+                        onClick={() => setSyncSelectedIds(prev => {
+                          const next = new Set(prev);
+                          if (next.has(t.id)) next.delete(t.id); else next.add(t.id);
+                          return next;
+                        })}
+                        style={{
+                          display:'flex', alignItems:'center', gap:10,
+                          padding:'10px 12px',
+                          borderBottom: i < syncTargetTags.length - 1 ? '1px solid #f0f0f0' : 'none',
+                          cursor:'pointer',
+                          background: checked ? '#e6f7ff' : '#fff',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          readOnly
+                          style={{ width:14, height:14, cursor:'pointer', accentColor:'#1890ff' }}
+                        />
+                        <div style={{ width:9, height:9, borderRadius:'50%', background:getColorHex(t.color), flexShrink:0 }} />
+                        <span style={{ flex:1, fontSize:13, color:'#333', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.label}</span>
+                        <span style={{ fontSize:12, color:'#999', flexShrink:0 }}>{formatUpdateTime(t.updatedAt)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding:'12px 20px', borderTop:'1px solid #f0f0f0', display:'flex', justifyContent:'flex-end', gap:8, flexShrink:0 }}>
+              <button
+                onClick={() => setShowSyncModal(false)}
+                style={{ padding:'6px 20px', border:'1px solid #e0e0e0', borderRadius:6, background:'#fff', fontSize:13, cursor:'pointer' }}
+              >
+                取消
+              </button>
+              <button
+                onClick={confirmSyncToOthers}
+                disabled={syncSelectedIds.size === 0 || !canSyncToOthers || syncTargetTags.length === 0}
+                style={{
+                  padding:'6px 20px',
+                  border:'none',
+                  borderRadius:6,
+                  background:(syncSelectedIds.size === 0 || !canSyncToOthers || syncTargetTags.length === 0) ? '#d9d9d9' : '#1890ff',
+                  color:'#fff',
+                  fontSize:13,
+                  cursor:(syncSelectedIds.size === 0 || !canSyncToOthers || syncTargetTags.length === 0) ? 'not-allowed' : 'pointer',
+                }}
+              >
+                确定
+              </button>
             </div>
           </div>
         </div>
