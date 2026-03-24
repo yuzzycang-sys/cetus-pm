@@ -65,16 +65,6 @@ function ModeToggle({ value, onChange }: { value: MatchMode; onChange: (v: Match
 function CustomBadge({ kind }: { kind: CustomKind | undefined }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 2 }}>
-      {/* 自定义 tag */}
-      <span style={{
-        fontSize: 10, lineHeight: '16px',
-        padding: '0 5px', borderRadius: 3,
-        background: '#f5f5f5', color: '#999',
-        border: '1px solid #e8e8e8',
-        whiteSpace: 'nowrap',
-      }}>
-        自定义
-      </span>
       {/* Mode tag */}
       {kind === 'exact' && (
         <span style={{
@@ -519,8 +509,7 @@ export function MultiSelectChip({
                         flex: hasAnnotations ? '0 0 44%' : 1,
                         minWidth: 0,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        // 自定义值用斜体略作区分
-                        fontStyle: isCustom ? 'italic' : 'normal',
+                        fontStyle: 'normal',
                         color: isCustom ? '#555' : '#333',
                       }}>
                         {opt}

@@ -118,6 +118,7 @@ export default function App() {
   const [dateStart, setDateStart] = useState('2026-02-01');
   const [dateEnd, setDateEnd] = useState('2026-02-28');
   const [filterSelections, setFilterSelections] = useState<Record<string, string[]>>({});
+  const [priceRange, setPriceRange] = useState({ min: '', max: '', roiMin: '', roiMax: '' });
 
   // Quick tags
   const [quickTags, setQuickTags] = useState<QuickTag[]>(INITIAL_TAGS);
@@ -285,6 +286,8 @@ export default function App() {
                 onDateChange={(s, e) => { setDateStart(s); setDateEnd(e); }}
                 filterSelections={filterSelections}
                 onFilterSelect={(key, sel) => setFilterSelections(prev => ({ ...prev, [key]: sel }))}
+                priceRange={priceRange}
+                onPriceRangeChange={(min, max, roiMin, roiMax) => setPriceRange({ min, max, roiMin, roiMax })}
                 channelLocked={channelLocked}
                 onChannelLockedClick={() => toast('快捷标签选中时，主/子渠道筛选不可用')}
               />

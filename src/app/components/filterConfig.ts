@@ -27,6 +27,7 @@ export const FILTER_GROUPS: FilterGroup[] = [
       { key: 'optGoal', label: '优化目标' },
       { key: 'deepOptGoal', label: '深度优化目标' },
       { key: 'oneClickStatus', label: '一键起量状态' },
+      { key: 'priceRange', label: '出价范围' },
     ],
   },
 ];

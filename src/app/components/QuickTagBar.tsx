@@ -117,7 +117,7 @@ export function QuickTagBar({ tags, onToggleTag, onManage, onReorderTags }: Prop
         onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.color = '#aaa'; }}
       >
         <Settings2 size={12} />
-        <span style={{ fontSize: 12 }}>快捷标签</span>
+        <span style={{ fontSize: 12, color: '#1890ff' }}>快捷标签</span>
       </div>
 
       {tags.map(tag => {
