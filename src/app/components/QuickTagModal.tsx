@@ -325,6 +325,9 @@ export function QuickTagModal({ tags: initialTags, onSave, onClose }: Props) {
   const [toast, setToast] = useState('');
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [syncSelectedIds, setSyncSelectedIds] = useState<Set<string>>(new Set());
+  const [syncSearch, setSyncSearch] = useState('');
+  const [syncPage, setSyncPage] = useState(1);
+  const [syncPageSize, setSyncPageSize] = useState(10);
 
   // Form state
   const [fName, setFName] = useState('');
@@ -425,6 +428,27 @@ export function QuickTagModal({ tags: initialTags, onSave, onClose }: Props) {
     () => myTags.filter(t => t.id !== selId),
     [myTags, selId],
   );
+  const syncFilteredTags = React.useMemo(() => {
+    const q = syncSearch.trim().toLowerCase();
+    if (!q) return syncTargetTags;
+    return syncTargetTags.filter(t => t.label.toLowerCase().includes(q));
+  }, [syncTargetTags, syncSearch]);
+  const syncTotal = syncFilteredTags.length;
+  const syncTotalPages = Math.max(1, Math.ceil(syncTotal / syncPageSize));
+  const syncSafePage = Math.min(syncPage, syncTotalPages);
+  const syncPagedTags = React.useMemo(() => {
+    const start = (syncSafePage - 1) * syncPageSize;
+    return syncFilteredTags.slice(start, start + syncPageSize);
+  }, [syncFilteredTags, syncSafePage, syncPageSize]);
+
+  const getProjectTags = (t: QuickTag) => {
+    const set = new Set<string>();
+    (t.mainChannels || []).forEach(p => {
+      const game = (p || '').split('-')[0]?.trim();
+      if (game) set.add(game);
+    });
+    return Array.from(set);
+  };
   const formatUpdateTime = (value?: string) => {
     if (!value) return '--';
     const d = new Date(value);
@@ -466,6 +490,9 @@ export function QuickTagModal({ tags: initialTags, onSave, onClose }: Props) {
 
   const openSyncModal = () => {
     setSyncSelectedIds(new Set());
+    setSyncSearch('');
+    setSyncPage(1);
+    setSyncPageSize(10);
     setShowSyncModal(true);
   };
   const confirmSyncToOthers = () => {
@@ -1019,17 +1046,37 @@ export function QuickTagModal({ tags: initialTags, onSave, onClose }: Props) {
               <X size={14} color="#999" style={{ cursor:'pointer' }} onClick={() => setShowSyncModal(false)} />
             </div>
 
-            <div style={{ padding:'14px 20px', borderBottom:'1px solid #f0f0f0', fontSize:12, color:'#999' }}>
-              仅支持选择「我」创建的其他标签，可多选。
+            <div style={{ padding:'12px 20px', borderBottom:'1px solid #f0f0f0' }}>
+              <div style={{ fontSize:12, color:'#999', marginBottom:10 }}>
+                仅支持选择「我」创建的其他标签，可多选。
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <div style={{ flex:1, display:'flex', alignItems:'center', gap:6, border:'1px solid #e0e0e0', borderRadius:8, padding:'7px 10px' }}>
+                  <Search size={14} color="#bbb" />
+                  <input
+                    value={syncSearch}
+                    onChange={e => { setSyncSearch(e.target.value); setSyncPage(1); }}
+                    placeholder="搜索标签名称"
+                    style={{ flex:1, border:'none', outline:'none', fontSize:13, background:'transparent' }}
+                  />
+                  {!!syncSearch && (
+                    <X size={14} color="#bbb" style={{ cursor:'pointer' }} onClick={() => { setSyncSearch(''); setSyncPage(1); }} />
+                  )}
+                </div>
+                <div style={{ fontSize:12, color:'#999', whiteSpace:'nowrap' }}>
+                  共 {syncTotal} 条
+                </div>
+              </div>
             </div>
 
             <div style={{ flex:1, overflowY:'auto', padding:'12px 20px', minHeight:220 }}>
-              {syncTargetTags.length === 0 ? (
+              {syncFilteredTags.length === 0 ? (
                 <div style={{ textAlign:'center', color:'#bbb', fontSize:13, padding:'40px 0' }}>暂无可同步的标签</div>
               ) : (
                 <div style={{ border:'1px solid #e0e0e0', borderRadius:10, overflow:'hidden' }}>
-                  {syncTargetTags.map((t, i) => {
+                  {syncPagedTags.map((t, i) => {
                     const checked = syncSelectedIds.has(t.id);
+                    const projects = getProjectTags(t);
                     return (
                       <div
                         key={t.id}
@@ -1041,7 +1088,7 @@ export function QuickTagModal({ tags: initialTags, onSave, onClose }: Props) {
                         style={{
                           display:'flex', alignItems:'center', gap:10,
                           padding:'10px 12px',
-                          borderBottom: i < syncTargetTags.length - 1 ? '1px solid #f0f0f0' : 'none',
+                          borderBottom: i < syncPagedTags.length - 1 ? '1px solid #f0f0f0' : 'none',
                           cursor:'pointer',
                           background: checked ? '#e6f7ff' : '#fff',
                         }}
@@ -1053,8 +1100,14 @@ export function QuickTagModal({ tags: initialTags, onSave, onClose }: Props) {
                           style={{ width:14, height:14, cursor:'pointer', accentColor:'#1890ff' }}
                         />
                         <div style={{ width:9, height:9, borderRadius:'50%', background:getColorHex(t.color), flexShrink:0 }} />
-                        <span style={{ flex:1, fontSize:13, color:'#333', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.label}</span>
-                        <span style={{ fontSize:12, color:'#999', flexShrink:0 }}>{formatUpdateTime(t.updatedAt)}</span>
+                        <span style={{ flex:1, minWidth:0, fontSize:13, color:'#333', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.label}</span>
+                        <div style={{ display:'flex', gap:6, flexShrink:0, alignItems:'center' }}>
+                          {projects.slice(0, 2).map(p => (
+                            <span key={p} style={{ fontSize:12, color:'#ff4d4f', fontWeight:600, whiteSpace:'nowrap' }}>{p}</span>
+                          ))}
+                          {projects.length > 2 && <span style={{ fontSize:12, color:'#ff4d4f', fontWeight:600 }}>+{projects.length - 2}</span>}
+                        </div>
+                        <span style={{ fontSize:12, color:'#999', flexShrink:0, whiteSpace:'nowrap' }}>{formatUpdateTime(t.updatedAt)}</span>
                       </div>
                     );
                   })}
@@ -1062,7 +1115,54 @@ export function QuickTagModal({ tags: initialTags, onSave, onClose }: Props) {
               )}
             </div>
 
-            <div style={{ padding:'12px 20px', borderTop:'1px solid #f0f0f0', display:'flex', justifyContent:'flex-end', gap:8, flexShrink:0 }}>
+            <div style={{ padding:'10px 20px', borderTop:'1px solid #f0f0f0', display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexShrink:0 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, color:'#999', fontSize:12 }}>
+                <span>已选 {syncSelectedIds.size} 个</span>
+                <span style={{ color:'#ddd' }}>|</span>
+                <span style={{ whiteSpace:'nowrap' }}>
+                  每页
+                  <select
+                    value={syncPageSize}
+                    onChange={e => { setSyncPageSize(parseInt(e.target.value, 10)); setSyncPage(1); }}
+                    style={{ marginLeft:6, border:'1px solid #e0e0e0', borderRadius:6, padding:'4px 8px', fontSize:12, outline:'none', background:'#fff' }}
+                  >
+                    {[10, 20, 50].map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </span>
+                <button
+                  onClick={() => setSyncPage(p => Math.max(1, p - 1))}
+                  disabled={syncSafePage <= 1}
+                  style={{
+                    padding:'4px 10px',
+                    border:'1px solid #e0e0e0',
+                    borderRadius:6,
+                    background:'#fff',
+                    cursor: syncSafePage <= 1 ? 'not-allowed' : 'pointer',
+                    color: syncSafePage <= 1 ? '#bbb' : '#666',
+                    fontSize:12,
+                  }}
+                >
+                  上一页
+                </button>
+                <span style={{ whiteSpace:'nowrap' }}>{syncSafePage}/{syncTotalPages}</span>
+                <button
+                  onClick={() => setSyncPage(p => Math.min(syncTotalPages, p + 1))}
+                  disabled={syncSafePage >= syncTotalPages}
+                  style={{
+                    padding:'4px 10px',
+                    border:'1px solid #e0e0e0',
+                    borderRadius:6,
+                    background:'#fff',
+                    cursor: syncSafePage >= syncTotalPages ? 'not-allowed' : 'pointer',
+                    color: syncSafePage >= syncTotalPages ? '#bbb' : '#666',
+                    fontSize:12,
+                  }}
+                >
+                  下一页
+                </button>
+              </div>
+
+              <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
               <button
                 onClick={() => setShowSyncModal(false)}
                 style={{ padding:'6px 20px', border:'1px solid #e0e0e0', borderRadius:6, background:'#fff', fontSize:13, cursor:'pointer' }}
@@ -1084,6 +1184,7 @@ export function QuickTagModal({ tags: initialTags, onSave, onClose }: Props) {
               >
                 确定
               </button>
+              </div>
             </div>
           </div>
         </div>
