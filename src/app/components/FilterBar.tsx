@@ -5,6 +5,7 @@ import { DateRangePicker } from './DateRangePicker';
 import { PriceRangePicker } from './PriceRangePicker';
 import { MultiSelectChip } from './MultiSelectChip';
 import { AccountInputChip } from './AccountInputChip';
+const TEXT_INPUT_KEYS = new Set(['accountId', 'adId']);
 import { FILTER_CHIP_DATA } from './filterConfig';
 
 const F = "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif";
@@ -177,6 +178,27 @@ export function FilterBar({
                       onChange={sel => onFilterSelect(key, sel)}
                       exclude={accountExclude}
                       onExcludeChange={setAccountExclude}
+                    />
+                    {isLocked && (
+                      <div onClick={e => { e.stopPropagation(); onChannelLockedClick?.(); }}
+                        style={{ position: 'absolute', inset: 0, cursor: 'not-allowed', pointerEvents: 'auto' }} />
+                    )}
+                  </div>
+                );
+              }
+
+              if (TEXT_INPUT_KEYS.has(key)) {
+                const entityLabel = key === 'adId' ? '广告' : '账号';
+                return (
+                  <div key={key} style={{ position: 'relative', opacity: isLocked ? 0.45 : 1 }}>
+                    <AccountInputChip
+                      entityLabel={entityLabel}
+                      selected={filterSelections[key] || []}
+                      onChange={sel => onFilterSelect(key, sel)}
+                      exclude={!!filterExcludes[key]}
+                      onExcludeChange={ex =>
+                        setFilterExcludes(prev => ({ ...prev, [key]: ex }))
+                      }
                     />
                     {isLocked && (
                       <div onClick={e => { e.stopPropagation(); onChannelLockedClick?.(); }}

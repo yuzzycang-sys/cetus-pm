@@ -11,6 +11,7 @@ interface Props {
   onChange: (selected: string[]) => void;
   exclude: boolean;
   onExcludeChange: (exclude: boolean) => void;
+  entityLabel?: string; // default: '账号'
 }
 
 function parseTokens(raw: string): string[] {
@@ -56,7 +57,7 @@ function KindBadge({ kind }: { kind: MatchMode }) {
   );
 }
 
-export function AccountInputChip({ selected, onChange, exclude, onExcludeChange }: Props) {
+export function AccountInputChip({ selected, onChange, exclude, onExcludeChange, entityLabel = '账号' }: Props) {
   const [open, setOpen]           = useState(false);
   const [subType, setSubType]     = useState<SubType>('id');
   const [matchMode, setMatchMode] = useState<MatchMode>('exact');
@@ -125,7 +126,7 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange 
   };
 
   // 触发器文案
-  const subLabel = subType === 'id' ? '账号ID' : '账号名称';
+  const subLabel = subType === 'id' ? `${entityLabel}ID` : `${entityLabel}名称`;
   const hasSelection = selected.length > 0;
   const activeColor  = exclude ? '#fa8c16' : '#1890ff';
   const activeBg     = exclude ? '#fff7e6' : '#e6f7ff';
@@ -193,7 +194,7 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange 
             {/* 子类型 tab */}
             <div style={{ display: 'flex', flex: 1 }}>
               {(['id', 'name'] as const).map(t => {
-                const lbl = t === 'id' ? '账号ID' : '账号名称';
+                const lbl = t === 'id' ? `${entityLabel}ID` : `${entityLabel}名称`;
                 const active = subType === t;
                 return (
                   <div key={t} onClick={() => {
@@ -228,8 +229,8 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange 
               onChange={e => setInputText(e.target.value)}
               placeholder={
                 subType === 'id'
-                  ? '输入账号ID，支持多个\n每行一个，或用逗号/空格分隔'
-                  : '输入账号名称，支持多个\n每行一个，或用逗号/空格分隔'
+                  ? `输入${entityLabel}ID，支持多个\n每行一个，或用逗号/空格分隔`
+                  : `输入${entityLabel}名称，支持多个\n每行一个，或用逗号/空格分隔`
               }
               rows={5}
               style={{

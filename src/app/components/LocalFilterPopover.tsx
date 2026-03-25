@@ -8,6 +8,9 @@ export type LocalFilters = Record<string, string[]>;
 
 type MatchMode = 'exact' | 'fuzzy';
 
+// Keys that use text-input style panel instead of option-list panel
+const TEXT_INPUT_KEYS = new Set(['accountId', 'adId']);
+
 interface Props {
   localFilters: LocalFilters;
   onChangeFilters: (next: LocalFilters) => void;
@@ -16,46 +19,49 @@ interface Props {
 }
 
 function parseTokens(raw: string): string[] {
-  return raw
-    .split(/[\n,，\s]+/)
-    .map(s => s.trim())
-    .filter(Boolean);
+  return raw.split(/[\n,，\s]+/).map(s => s.trim()).filter(Boolean);
+}
+
+function KindBadge({ kind }: { kind: MatchMode }) {
+  const isExact = kind === 'exact';
+  return (
+    <span style={{
+      fontSize: 10, lineHeight: '16px', padding: '0 4px', borderRadius: 3,
+      background: isExact ? '#f6ffed' : '#f9f0ff',
+      color: isExact ? '#52c41a' : '#722ed1',
+      border: `1px solid ${isExact ? '#b7eb8f' : '#d3adf7'}`,
+      whiteSpace: 'nowrap', flexShrink: 0,
+    }}>
+      {isExact ? '精确' : '模糊'}
+    </span>
+  );
 }
 
 function ModeToggle({ value, onChange }: { value: MatchMode; onChange: (v: MatchMode) => void }) {
   return (
     <div style={{
-      display: 'inline-flex',
-      border: '1px solid #d9d9d9',
-      borderRadius: 5,
-      overflow: 'hidden',
-      fontSize: 12,
-      flexShrink: 0,
+      display: 'inline-flex', border: '1px solid #d9d9d9',
+      borderRadius: 4, overflow: 'hidden', fontSize: 12, flexShrink: 0,
     }}>
       {(['exact', 'fuzzy'] as const).map(m => {
         const active = value === m;
-        const label = m === 'exact' ? '精确' : '模糊';
         return (
-          <div
-            key={m}
-            onClick={() => onChange(m)}
-            style={{
-              padding: '3px 9px',
-              cursor: 'pointer',
-              background: active ? '#1890ff' : '#fff',
-              color: active ? '#fff' : '#555',
-              userSelect: 'none',
-              transition: 'background 0.12s, color 0.12s',
-              borderRight: m === 'exact' ? '1px solid #d9d9d9' : 'none',
-            }}
-          >
-            {label}
+          <div key={m} onClick={() => onChange(m)} style={{
+            padding: '3px 9px', cursor: 'pointer',
+            background: active ? '#1890ff' : '#fff',
+            color: active ? '#fff' : '#555',
+            userSelect: 'none', transition: 'background 0.12s, color 0.12s',
+            borderRight: m === 'exact' ? '1px solid #d9d9d9' : 'none',
+          }}>
+            {m === 'exact' ? '精确' : '模糊'}
           </div>
         );
       })}
     </div>
   );
 }
+
+// ── Option-list panel (for filters with predefined options) ──────────────────
 
 interface ItemPanelProps {
   label: string;
@@ -71,6 +77,7 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
   const [batchText, setBatchText] = useState('');
   const [matchMode, setMatchMode] = useState<MatchMode>('exact');
   const [exclude, setExclude] = useState(false);
+  const [customMeta, setCustomMeta] = useState<Record<string, MatchMode>>({});
 
   const searchRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -80,7 +87,13 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
     if (mode === 'batch') setTimeout(() => textareaRef.current?.focus(), 50);
   }, [mode]);
 
+  // Reset exclude when all selections cleared externally
+  useEffect(() => {
+    if (selected.length === 0) setExclude(false);
+  }, [selected.length]);
+
   const optionSet = useMemo(() => new Set(options), [options]);
+  const isCustomValue = (v: string) => !optionSet.has(v);
 
   const filteredOptions = options.filter(o =>
     o.toLowerCase().includes(search.toLowerCase())
@@ -91,10 +104,15 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
       ? filteredOptions
       : selected.filter(s => s.toLowerCase().includes(search.toLowerCase()));
 
+  const customCount = selected.filter(s => isCustomValue(s)).length;
+
   const toggleOption = (opt: string) => {
     if (selected.includes(opt)) {
       const next = selected.filter(s => s !== opt);
       onChangeSelected(next);
+      if (customMeta[opt] !== undefined) {
+        setCustomMeta(prev => { const n = { ...prev }; delete n[opt]; return n; });
+      }
     } else {
       onChangeSelected([...selected, opt]);
     }
@@ -111,6 +129,11 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
     if (isAllSelected) {
       const fs = new Set(filteredOptions);
       onChangeSelected(selected.filter(s => !fs.has(s)));
+      setCustomMeta(prev => {
+        const n = { ...prev };
+        filteredOptions.forEach(o => delete n[o]);
+        return n;
+      });
     } else {
       onChangeSelected(Array.from(new Set([...selected, ...filteredOptions])));
     }
@@ -124,6 +147,7 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
   const handleClear = () => {
     onChangeSelected([]);
     setExclude(false);
+    setCustomMeta({});
   };
 
   // Batch mode
@@ -138,6 +162,9 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
     } else {
       if (batchTokens.length === 0) return;
       onChangeSelected(Array.from(new Set([...selected, ...batchTokens])));
+      const newMeta: Record<string, MatchMode> = {};
+      batchTokens.forEach(t => { newMeta[t] = 'fuzzy'; });
+      setCustomMeta(prev => ({ ...prev, ...newMeta }));
     }
     setBatchText('');
     setMode('list');
@@ -148,17 +175,15 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
     <div
       style={{
         margin: '4px 0 4px 24px',
-        border: '1px solid #e8e8e8',
-        borderRadius: 6,
-        background: '#fff',
-        overflow: 'hidden',
+        border: '1px solid #e8e8e8', borderRadius: 6,
+        background: '#fff', overflow: 'hidden',
       }}
       onClick={e => e.stopPropagation()}
     >
       {/* ── LIST MODE ── */}
       {mode === 'list' && (<>
 
-        {/* Search bar + 批量输入 */}
+        {/* Search + 批量输入 */}
         <div style={{ padding: '10px 12px 0' }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
@@ -195,15 +220,23 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
         </div>
 
         {/* Tabs */}
-        <div style={{
-          display: 'flex',
-          borderBottom: '1px solid #f0f0f0',
-          padding: '0 12px',
-          marginTop: 8,
-        }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid #f0f0f0', padding: '0 12px', marginTop: 8 }}>
           {(['all', 'selected'] as const).map(t => {
             const active = tab === t;
-            const tabLabel = t === 'all' ? '全部' : `已选 (${selected.length})`;
+            const tabLabel = t === 'all' ? '全部' : (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span>已选 ({selected.length})</span>
+                {customCount > 0 && (
+                  <span style={{
+                    fontSize: 10, padding: '0 4px', borderRadius: 3,
+                    background: '#f5f5f5', color: '#999', border: '1px solid #e8e8e8',
+                    lineHeight: '16px',
+                  }}>
+                    {customCount} 自定义
+                  </span>
+                )}
+              </span>
+            );
             return (
               <div
                 key={t}
@@ -231,6 +264,7 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
           ) : (
             displayList.map(opt => {
               const checked = selected.includes(opt);
+              const kind = customMeta[opt];
               return (
                 <div
                   key={opt}
@@ -251,7 +285,8 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
                   }}>
                     {checked && <Check size={10} color="#fff" strokeWidth={3} />}
                   </div>
-                  <span style={{ color: checked ? '#1890ff' : '#333' }}>{opt}</span>
+                  <span style={{ flex: 1, color: checked ? '#1890ff' : '#333' }}>{opt}</span>
+                  {kind && <KindBadge kind={kind} />}
                 </div>
               );
             })
@@ -261,9 +296,7 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
         {/* Footer: 全选 + 排除 */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '8px 14px',
-          borderTop: '1px solid #f0f0f0',
-          background: '#fafafa',
+          padding: '8px 14px', borderTop: '1px solid #f0f0f0', background: '#fafafa',
         }}>
           <div
             onClick={!selectAllDisabled ? handleSelectAll : undefined}
@@ -271,16 +304,14 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               cursor: selectAllDisabled ? 'not-allowed' : 'pointer',
-              opacity: selectAllDisabled ? 0.38 : 1,
-              userSelect: 'none',
+              opacity: selectAllDisabled ? 0.38 : 1, userSelect: 'none',
             }}
           >
             <div style={{
               width: 14, height: 14, borderRadius: 3, flexShrink: 0,
               border: `1.5px solid ${isAllSelected && !selectAllDisabled ? '#1890ff' : '#d9d9d9'}`,
               background: isAllSelected && !selectAllDisabled ? '#1890ff' : '#fff',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.12s',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.12s',
             }}>
               {isAllSelected && !selectAllDisabled && <Check size={10} color="#fff" strokeWidth={3} />}
             </div>
@@ -293,16 +324,14 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               cursor: excludeDisabled ? 'not-allowed' : 'pointer',
-              opacity: excludeDisabled ? 0.38 : 1,
-              userSelect: 'none',
+              opacity: excludeDisabled ? 0.38 : 1, userSelect: 'none',
             }}
           >
             <div style={{
               width: 14, height: 14, borderRadius: 3, flexShrink: 0,
               border: `1.5px solid ${exclude ? '#fa8c16' : '#d9d9d9'}`,
               background: exclude ? '#fa8c16' : '#fff',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.12s',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.12s',
             }}>
               {exclude && <Check size={10} color="#fff" strokeWidth={3} />}
             </div>
@@ -330,12 +359,9 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
       {/* ── BATCH MODE ── */}
       {mode === 'batch' && (<>
 
-        {/* Header: 返回 + 精确/模糊 toggle */}
         <div style={{
           display: 'flex', alignItems: 'center',
-          padding: '9px 12px 8px',
-          borderBottom: '1px solid #f0f0f0',
-          gap: 8,
+          padding: '9px 12px 8px', borderBottom: '1px solid #f0f0f0', gap: 8,
         }}>
           <div
             onClick={() => setMode('list')}
@@ -353,21 +379,17 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
           <ModeToggle value={matchMode} onChange={setMatchMode} />
         </div>
 
-        {/* Hint bar */}
         <div style={{
-          padding: '5px 12px',
-          fontSize: 11,
+          padding: '5px 12px', fontSize: 11,
           color: matchMode === 'fuzzy' ? '#7c4dff' : '#999',
           background: matchMode === 'fuzzy' ? '#f3f0ff' : '#fafafa',
-          borderBottom: '1px solid #f0f0f0',
-          transition: 'all 0.15s',
+          borderBottom: '1px solid #f0f0f0', transition: 'all 0.15s',
         }}>
           {matchMode === 'exact'
             ? '仅追加与选项列表精确匹配的值，未命中的将被忽略'
             : '每个关键字追加后执行包含匹配（LIKE %keyword%），支持自定义值'}
         </div>
 
-        {/* Textarea */}
         <div style={{ padding: '10px 12px 0' }}>
           <textarea
             ref={textareaRef}
@@ -385,16 +407,12 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
           />
         </div>
 
-        {/* Exact mode: match status */}
         {matchMode === 'exact' && batchTokens.length > 0 && (
           <div style={{ padding: '7px 13px 4px', display: 'flex', flexDirection: 'column', gap: 4 }}>
             {exactMatched.length > 0 && (
               <div style={{ fontSize: 11, color: '#52c41a', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span>✓ 精确匹配 {exactMatched.length} 项：</span>
-                <span style={{
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  color: '#389e0d', maxWidth: 140,
-                }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#389e0d', maxWidth: 140 }}>
                   {exactMatched.join('、')}
                 </span>
               </div>
@@ -409,23 +427,17 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
                 }}>
                   已忽略 {exactUnmatched.length} 项
                 </span>
-                <span style={{
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  maxWidth: 150,
-                }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 150 }}>
                   {exactUnmatched.join('、')}
                 </span>
               </div>
             )}
             {exactMatched.length === 0 && (
-              <div style={{ fontSize: 11, color: '#ff4d4f' }}>
-                ✕ 所有值均未在选项中找到，无法追加
-              </div>
+              <div style={{ fontSize: 11, color: '#ff4d4f' }}>✕ 所有值均未在选项中找到，无法追加</div>
             )}
           </div>
         )}
 
-        {/* Fuzzy mode: tokens info */}
         {matchMode === 'fuzzy' && batchTokens.length > 0 && (
           <div style={{ padding: '7px 13px 4px' }}>
             <div style={{ fontSize: 11, color: '#7c4dff', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
@@ -441,16 +453,12 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
           </div>
         )}
 
-        {/* Confirm button */}
         <div style={{ padding: '10px 12px 12px' }}>
           <button
             onClick={handleBatchConfirm}
             disabled={matchMode === 'exact' ? exactMatched.length === 0 : batchTokens.length === 0}
             style={{
-              width: '100%',
-              padding: '7px 0',
-              borderRadius: 5,
-              border: 'none',
+              width: '100%', padding: '7px 0', borderRadius: 5, border: 'none',
               background: (() => {
                 if (matchMode === 'exact') return exactMatched.length > 0 ? '#1890ff' : '#f0f0f0';
                 return batchTokens.length > 0 ? '#7c4dff' : '#f0f0f0';
@@ -464,8 +472,7 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
                 if (matchMode === 'exact') return exactMatched.length > 0 ? 'pointer' : 'not-allowed';
                 return batchTokens.length > 0 ? 'pointer' : 'not-allowed';
               })(),
-              transition: 'background 0.15s',
-              fontFamily: F,
+              transition: 'background 0.15s', fontFamily: F,
             }}
           >
             {matchMode === 'exact'
@@ -481,6 +488,217 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
     </div>
   );
 }
+
+// ── Text-input panel (for accountId / adId) ──────────────────────────────────
+
+interface TextInputPanelProps {
+  entityLabel: string; // '账号' | '广告'
+  selected: string[];
+  onChangeSelected: (next: string[]) => void;
+}
+
+function TextInputPanel({ entityLabel, selected, onChangeSelected }: TextInputPanelProps) {
+  const [subType, setSubType] = useState<'id' | 'name'>('id');
+  const [matchMode, setMatchMode] = useState<MatchMode>('exact');
+  const [inputText, setInputText] = useState('');
+  const [valueMeta, setValueMeta] = useState<Record<string, MatchMode>>({});
+  const [exclude, setExclude] = useState(false);
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setTimeout(() => textareaRef.current?.focus(), 50);
+  }, []);
+
+  useEffect(() => {
+    if (selected.length === 0) { setExclude(false); setValueMeta({}); }
+  }, [selected.length]);
+
+  const tokens = useMemo(() => parseTokens(inputText), [inputText]);
+  const newTokens = useMemo(() => tokens.filter(t => !selected.includes(t)), [tokens, selected]);
+  const dupCount = tokens.length - newTokens.length;
+  const canConfirm = newTokens.length > 0;
+
+  const handleConfirm = () => {
+    if (!canConfirm) return;
+    const merged = [...selected, ...newTokens];
+    onChangeSelected(merged);
+    const meta: Record<string, MatchMode> = {};
+    newTokens.forEach(t => { meta[t] = matchMode; });
+    setValueMeta(prev => ({ ...prev, ...meta }));
+    setInputText('');
+    textareaRef.current?.focus();
+  };
+
+  const handleRemove = (v: string) => {
+    onChangeSelected(selected.filter(s => s !== v));
+    setValueMeta(prev => { const n = { ...prev }; delete n[v]; return n; });
+  };
+
+  const handleClear = () => {
+    onChangeSelected([]);
+    setExclude(false);
+    setValueMeta({});
+  };
+
+  const handleSwitchSubType = (t: 'id' | 'name') => {
+    if (t === subType) return;
+    setSubType(t);
+    onChangeSelected([]);
+    setExclude(false);
+    setValueMeta({});
+    setInputText('');
+  };
+
+  return (
+    <div
+      style={{
+        margin: '4px 0 4px 24px',
+        border: '1px solid #e8e8e8', borderRadius: 6,
+        background: '#fff', overflow: 'hidden',
+      }}
+      onClick={e => e.stopPropagation()}
+    >
+      {/* Top bar: subType tabs + 精确/模糊 */}
+      <div style={{
+        display: 'flex', alignItems: 'center',
+        borderBottom: '1px solid #f0f0f0', padding: '0 12px',
+      }}>
+        <div style={{ display: 'flex', flex: 1 }}>
+          {(['id', 'name'] as const).map(t => {
+            const lbl = t === 'id' ? `${entityLabel}ID` : `${entityLabel}名称`;
+            const active = subType === t;
+            return (
+              <div key={t} onClick={() => handleSwitchSubType(t)} style={{
+                padding: '8px 10px 7px', fontSize: 13, cursor: 'pointer',
+                color: active ? '#1890ff' : '#555',
+                borderBottom: active ? '2px solid #1890ff' : '2px solid transparent',
+                fontWeight: active ? 500 : 400,
+                marginBottom: -1, userSelect: 'none', transition: 'color 0.15s',
+              }}>
+                {lbl}
+              </div>
+            );
+          })}
+        </div>
+        <ModeToggle value={matchMode} onChange={setMatchMode} />
+      </div>
+
+      {/* Textarea */}
+      <div style={{ padding: '10px 12px 0' }}>
+        <textarea
+          ref={textareaRef}
+          value={inputText}
+          onChange={e => setInputText(e.target.value)}
+          placeholder={
+            subType === 'id'
+              ? `输入${entityLabel}ID，支持多个\n每行一个，或用逗号/空格分隔`
+              : `输入${entityLabel}名称，支持多个\n每行一个，或用逗号/空格分隔`
+          }
+          rows={4}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            border: '1px solid #e0e0e0', borderRadius: 5,
+            padding: '8px 10px', fontSize: 12, color: '#333',
+            resize: 'none', outline: 'none', lineHeight: 1.8,
+            fontFamily: F, background: '#fafafa', transition: 'border-color 0.15s',
+          }}
+          onFocus={e => { e.currentTarget.style.borderColor = '#1890ff'; }}
+          onBlur={e => { e.currentTarget.style.borderColor = '#e0e0e0'; }}
+        />
+
+        {/* Parse hint */}
+        <div style={{ minHeight: 20, marginTop: 4, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+          {tokens.length > 0 ? (
+            <>
+              <span style={{ color: '#52c41a' }}>✓ {newTokens.length} 项可添加</span>
+              {dupCount > 0 && <span style={{ color: '#bbb' }}>· {dupCount} 项已存在将跳过</span>}
+              <KindBadge kind={matchMode} />
+            </>
+          ) : (
+            <span style={{ color: '#ccc' }}>支持批量粘贴</span>
+          )}
+        </div>
+      </div>
+
+      {/* Confirm button */}
+      <div style={{ padding: '6px 12px 0' }}>
+        <button
+          onClick={handleConfirm}
+          disabled={!canConfirm}
+          style={{
+            width: '100%', padding: '7px 0', borderRadius: 4,
+            border: 'none', fontSize: 13, fontFamily: F,
+            background: canConfirm ? (matchMode === 'fuzzy' ? '#7c4dff' : '#1890ff') : '#f0f0f0',
+            color: canConfirm ? '#fff' : '#bbb',
+            cursor: canConfirm ? 'pointer' : 'not-allowed',
+            transition: 'background 0.15s',
+          }}
+        >
+          {canConfirm
+            ? `添加 ${newTokens.length} 项`
+            : tokens.length > 0 ? '所有值已存在' : '请输入内容'}
+        </button>
+      </div>
+
+      {/* Added list */}
+      {selected.length > 0 && (
+        <>
+          <div style={{
+            padding: '8px 14px 4px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <span style={{ fontSize: 11, color: '#999' }}>已添加 {selected.length} 项</span>
+            <span onClick={handleClear} style={{ fontSize: 11, color: '#1890ff', cursor: 'pointer', userSelect: 'none' }}>
+              清空
+            </span>
+          </div>
+
+          <div style={{ maxHeight: 150, overflowY: 'auto', padding: '0 0 4px' }}>
+            {selected.map(v => (
+              <div
+                key={v}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 14px' }}
+                onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = '#f5f5f5'}
+                onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
+              >
+                <span style={{ flex: 1, fontSize: 12, color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {v}
+                </span>
+                {valueMeta[v] && <KindBadge kind={valueMeta[v]} />}
+                <X size={13} color="#bbb" style={{ cursor: 'pointer', flexShrink: 0 }} onClick={() => handleRemove(v)} />
+              </div>
+            ))}
+          </div>
+
+          {/* 排除 */}
+          <div style={{
+            display: 'flex', alignItems: 'center',
+            padding: '7px 14px 10px',
+            borderTop: '1px solid #f0f0f0', background: '#fafafa',
+          }}>
+            <div
+              onClick={() => setExclude(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}
+            >
+              <div style={{
+                width: 14, height: 14, borderRadius: 3, flexShrink: 0,
+                border: `1.5px solid ${exclude ? '#fa8c16' : '#d9d9d9'}`,
+                background: exclude ? '#fa8c16' : '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.12s',
+              }}>
+                {exclude && <Check size={10} color="#fff" strokeWidth={3} />}
+              </div>
+              <span style={{ fontSize: 12, color: exclude ? '#fa8c16' : '#444' }}>排除</span>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Main popover ─────────────────────────────────────────────────────────────
 
 export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null);
@@ -544,18 +762,11 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
     <div
       ref={ref}
       style={{
-        position: 'fixed',
-        top,
-        left,
-        zIndex: 9999,
-        width: 460,
-        maxHeight: 560,
-        overflowY: 'auto',
-        background: '#fff',
-        borderRadius: 8,
+        position: 'fixed', top, left, zIndex: 9999,
+        width: 460, maxHeight: 580, overflowY: 'auto',
+        background: '#fff', borderRadius: 8,
         boxShadow: '0 6px 24px rgba(0,0,0,0.12)',
-        border: '1px solid #e8e8e8',
-        fontFamily: F,
+        border: '1px solid #e8e8e8', fontFamily: F,
       }}
     >
       {/* Info banner */}
@@ -581,6 +792,7 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
                 const expanded = expandedKey === item.key;
                 const selectedValues = localFilters[item.key] || [];
                 const chipData = FILTER_CHIP_DATA[item.key];
+                const isTextInput = TEXT_INPUT_KEYS.has(item.key);
 
                 return (
                   <div key={item.key}>
@@ -637,7 +849,7 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
                       )}
 
                       {/* Expand toggle */}
-                      {chipData && (
+                      {(chipData || isTextInput) && (
                         <div
                           onClick={e => { e.stopPropagation(); setExpandedKey(prev => prev === item.key ? null : item.key); }}
                           style={{ color: '#bbb', flexShrink: 0, lineHeight: 0 }}
@@ -647,8 +859,16 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
                       )}
                     </div>
 
-                    {/* Expanded value picker */}
-                    {expanded && chipData && (
+                    {/* Expanded panel */}
+                    {expanded && isTextInput && (
+                      <TextInputPanel
+                        key={item.key}
+                        entityLabel={item.key === 'accountId' ? '账号' : '广告'}
+                        selected={selectedValues}
+                        onChangeSelected={next => handleChangeItemSelected(item.key, next)}
+                      />
+                    )}
+                    {expanded && !isTextInput && chipData && (
                       <ItemPanel
                         key={item.key}
                         label={item.label}
@@ -672,10 +892,7 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <span style={{ fontSize: 12, color: '#999' }}>已设置 {totalActive} 个维度条件</span>
-          <span
-            onClick={handleClearAll}
-            style={{ fontSize: 12, color: '#ff4d4f', cursor: 'pointer' }}
-          >
+          <span onClick={handleClearAll} style={{ fontSize: 12, color: '#ff4d4f', cursor: 'pointer' }}>
             清空全部
           </span>
         </div>
