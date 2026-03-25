@@ -834,29 +834,23 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
                       </div>
 
                       {/* Label */}
-                      <span style={{ fontSize: 13, color: active ? activeColor : '#333', flex: 1 }}>
+                      <span style={{ fontSize: 13, color: active ? activeColor : '#333', flexShrink: 0 }}>
                         {item.label}
                       </span>
 
-                      {/* Selected value chips */}
+                      {/* Selected value summary — single line, no wrap */}
                       {active && selectedValues.length > 0 && (
-                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', flex: 2 }} onClick={e => e.stopPropagation()}>
-                          {selectedValues.map(v => (
-                            <span
-                              key={v}
-                              style={{
-                                display: 'inline-flex', alignItems: 'center', gap: 3,
-                                padding: '1px 6px', background: chipBg,
-                                border: `1px solid ${chipBorder}`, borderRadius: 3,
-                                fontSize: 12, color: activeColor, whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {v}
-                              <X size={10} style={{ cursor: 'pointer', flexShrink: 0 }}
-                                onClick={e => handleRemoveValue(item.key, v, e)} />
-                            </span>
-                          ))}
-                        </div>
+                        <span style={{
+                          flex: 1, minWidth: 0,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          fontSize: 12, color: activeColor,
+                          padding: '1px 6px', background: chipBg,
+                          border: `1px solid ${chipBorder}`, borderRadius: 3,
+                        }}>
+                          {selectedValues.length <= 2
+                            ? selectedValues.join('、')
+                            : `${selectedValues.slice(0, 2).join('、')} 等${selectedValues.length}项`}
+                        </span>
                       )}
 
                       {/* Expand toggle */}
