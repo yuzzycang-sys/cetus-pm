@@ -814,10 +814,12 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
                         border: `1px solid ${active ? activeBorder : 'transparent'}`,
                         transition: 'all 0.15s',
                       }}
-                      onClick={() => handleCheckboxClick(item.key)}
+                      onClick={() => setExpandedKey(prev => prev === item.key ? null : item.key)}
                     >
-                      {/* Checkbox */}
-                      <div style={{
+                      {/* Checkbox — only this clears the selection */}
+                      <div
+                        onClick={e => { e.stopPropagation(); handleCheckboxClick(item.key); }}
+                        style={{
                         width: 16, height: 16, borderRadius: 3, flexShrink: 0,
                         border: `1.5px solid ${active ? activeColor : '#d9d9d9'}`,
                         background: active ? activeColor : '#fff',
