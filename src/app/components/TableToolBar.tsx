@@ -134,17 +134,23 @@ export function TableToolBar({
 
           {/* Aggregate dimension */}
           <div ref={aggDimRef} style={{ position: 'relative' }}>
-            <ToolbarBtn
-              icon={<Settings2 size={13} />}
-              label="聚合维度"
-              onClick={() => setShowAggDim(v => !v)}
-              active={showAggDim}
-            />
+            {(() => {
+              const userDimCount = activeDims.filter(k => k !== 'time').length;
+              return (
+                <ToolbarBtn
+                  icon={<Settings2 size={13} />}
+                  label={userDimCount > 0 ? `聚合维度 · ${userDimCount}` : '聚合维度'}
+                  onClick={() => setShowAggDim(v => !v)}
+                  active={showAggDim || userDimCount > 0}
+                />
+              );
+            })()}
             {showAggDim && (
               <AggregateDimensionPopover
                 activeDims={activeDims}
                 onChangeDims={onChangeDims}
                 onClose={() => setShowAggDim(false)}
+                timeGranularity={timeGranularity}
               />
             )}
           </div>
