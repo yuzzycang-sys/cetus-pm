@@ -1,145 +1,88 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { Menu } from 'antd';
 
-const F = "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif";
-
-// Feishu design tokens
-const PRIMARY    = '#3370ff';
-const SIDEBAR_BG = '#ffffff';
-const TEXT_PRI   = '#1f2329';
-const TEXT_SEC   = '#646a73';
-const TEXT_TER   = '#8f959e';
-const ACTIVE_BG  = '#e8f0ff';
-const HOVER_BG   = '#ebebeb';
+const LEAF_ITEMS = ['腾讯', '头条', '快手'];
 
 export function Sidebar() {
   const [expandedPlatform, setExpandedPlatform] = useState<string>('快手');
   const [expandedSubmenu,  setExpandedSubmenu]  = useState<string>('广告分析');
   const [activeSideItem,   setActiveSideItem]   = useState<string>('头条');
 
-  return (
-    <div style={{
-      width: 128, background: SIDEBAR_BG, fontFamily: F,
-      flexShrink: 0, overflowY: 'auto',
-      borderRight: '1px solid #dee0e3',
-    }}>
+  // Compute openKeys from state: include platform key if expanded, and submenu key if expanded
+  const openKeys: string[] = [];
+  if (expandedPlatform) openKeys.push(expandedPlatform);
+  if (expandedPlatform && expandedSubmenu) openKeys.push(`${expandedPlatform}__${expandedSubmenu}`);
 
-      {/* 快手 */}
-      <PlatformRow
-        name="快手"
-        expanded={expandedPlatform === '快手'}
-        onToggle={() => setExpandedPlatform(p => p === '快手' ? '' : '快手')}
-      />
-      {expandedPlatform === '快手' && (
-        <div>
-          <SubmenuRow
-            name="广告分析"
-            expanded={expandedSubmenu === '广告分析'}
-            onToggle={() => setExpandedSubmenu(s => s === '广告分析' ? '' : '广告分析')}
-          />
-          {expandedSubmenu === '广告分析' && (
-            <div>
-              {['腾讯', '头条', '快手'].map(item => (
-                <LeafItem
-                  key={item}
-                  name={item}
-                  active={activeSideItem === item}
-                  onClick={() => setActiveSideItem(item)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+  const handleOpenChange = (keys: string[]) => {
+    // Determine which platform-level keys are open (no '__' in key)
+    const platformKeys = keys.filter(k => !k.includes('__'));
+    const submenuKeys  = keys.filter(k => k.includes('__'));
 
-      <PlatformRow
-        name="腾讯"
-        expanded={expandedPlatform === '腾讯'}
-        onToggle={() => setExpandedPlatform(p => p === '腾讯' ? '' : '腾讯')}
-      />
+    const newPlatform = platformKeys.length > 0 ? platformKeys[platformKeys.length - 1] : '';
+    setExpandedPlatform(newPlatform);
 
-      <PlatformRow
-        name="头条"
-        expanded={expandedPlatform === '头条'}
-        onToggle={() => setExpandedPlatform(p => p === '头条' ? '' : '头条')}
-      />
-    </div>
-  );
-}
+    if (submenuKeys.length > 0) {
+      const lastSubmenu = submenuKeys[submenuKeys.length - 1];
+      setExpandedSubmenu(lastSubmenu.split('__')[1] ?? '');
+    } else {
+      setExpandedSubmenu('');
+    }
+  };
 
-function PlatformRow({ name, expanded, onToggle }: {
-  name: string; expanded: boolean; onToggle: () => void;
-}) {
-  const [hovered, setHovered] = useState(false);
+  const items = [
+    {
+      key: '快手',
+      label: '快手',
+      children: [
+        {
+          key: '快手__广告分析',
+          label: '广告分析',
+          children: LEAF_ITEMS.map(item => ({
+            key: item,
+            label: item,
+          })),
+        },
+      ],
+    },
+    {
+      key: '腾讯',
+      label: '腾讯',
+    },
+    {
+      key: '头条',
+      label: '头条',
+    },
+  ];
+
   return (
     <div
-      onClick={onToggle}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        margin: '2px 6px', padding: '6px 8px', borderRadius: 6,
-        cursor: 'pointer', fontSize: 13,
-        color: expanded ? TEXT_PRI : TEXT_SEC,
-        background: hovered ? HOVER_BG : 'transparent',
-        fontWeight: expanded ? 500 : 400,
-        transition: 'background 0.1s',
+        width: 128,
+        flexShrink: 0,
+        borderRight: '1px solid #d9d9d9',
+        overflowY: 'auto',
+        background: '#ffffff',
       }}
     >
-      <span>{name}</span>
-      {expanded
-        ? <ChevronDown  size={12} color={TEXT_TER} />
-        : <ChevronRight size={12} color={TEXT_TER} />}
-    </div>
-  );
-}
-
-function SubmenuRow({ name, expanded, onToggle }: {
-  name: string; expanded: boolean; onToggle: () => void;
-}) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <div
-      onClick={onToggle}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        margin: '1px 6px', padding: '5px 8px 5px 18px', borderRadius: 6,
-        cursor: 'pointer', fontSize: 12,
-        color: expanded ? TEXT_SEC : TEXT_TER,
-        background: hovered ? HOVER_BG : 'transparent',
-        transition: 'background 0.1s',
-      }}
-    >
-      <span>{name}</span>
-      {expanded
-        ? <ChevronDown  size={11} color={TEXT_TER} />
-        : <ChevronRight size={11} color={TEXT_TER} />}
-    </div>
-  );
-}
-
-function LeafItem({ name, active, onClick }: {
-  name: string; active: boolean; onClick: () => void;
-}) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <div
-      onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        margin: '1px 6px', padding: '5px 8px 5px 28px', borderRadius: 6,
-        fontSize: 12,
-        color: active ? PRIMARY : hovered ? TEXT_PRI : TEXT_SEC,
-        background: active ? ACTIVE_BG : hovered ? HOVER_BG : 'transparent',
-        cursor: 'pointer',
-        fontWeight: active ? 500 : 400,
-        transition: 'background 0.1s, color 0.1s',
-      }}
-    >
-      {name}
+      <Menu
+        mode="inline"
+        openKeys={openKeys}
+        selectedKeys={[activeSideItem]}
+        onOpenChange={handleOpenChange}
+        onClick={({ key }) => {
+          // Only leaf items (腾讯/头条/快手 under 广告分析) are selectable
+          if (LEAF_ITEMS.includes(key)) {
+            setActiveSideItem(key);
+          }
+        }}
+        items={items}
+        style={{
+          width: 128,
+          border: 'none',
+          fontSize: 13,
+        }}
+        inlineIndent={12}
+      />
     </div>
   );
 }

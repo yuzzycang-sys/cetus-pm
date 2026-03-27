@@ -1,8 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import ReactDOM from 'react-dom';
-import { Plus, Edit2, Trash2, X, Check, ChevronRight } from 'lucide-react';
-
-const F = "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif";
+import { ChevronRight } from 'lucide-react';
+import { Button, Input, InputNumber, Select, Modal } from 'antd';
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  CheckOutlined,
+} from '@ant-design/icons';
 
 // ── Public types ───────────────────────────────────────────────
 export type MetricOperator = '>' | '<' | '>=' | '<=' | '=' | 'between';
@@ -132,7 +137,6 @@ export function MetricFilterPopover({
         borderRadius: 6,
         boxShadow: '0 4px 20px rgba(0,0,0,0.14)',
         border: '1px solid #e8e8e8',
-        fontFamily: F,
         overflow: 'hidden',
       }}
     >
@@ -156,18 +160,19 @@ export function MetricFilterPopover({
       ))}
 
       {/* New */}
-      <div
-        onClick={onNew}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '9px 14px', fontSize: 13, color: '#1890ff', cursor: 'pointer',
-          borderTop: combinations.length > 0 ? '1px solid #f0f0f0' : 'none',
-        }}
-        onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = '#f5f9ff'}
-        onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
-      >
-        <Plus size={13} />
-        <span>新建组合</span>
+      <div style={{
+        borderTop: combinations.length > 0 ? '1px solid #f0f0f0' : 'none',
+        padding: '4px 8px',
+      }}>
+        <Button
+          type="dashed"
+          icon={<PlusOutlined />}
+          onClick={onNew}
+          block
+          style={{ fontSize: 13, color: '#1890ff', borderColor: '#91caff' }}
+        >
+          新建组合
+        </Button>
       </div>
     </div>
   );
@@ -191,7 +196,7 @@ function DropdownItem({ label, active, onClick }: {
       }}
     >
       <div style={{ width: 14, flexShrink: 0, lineHeight: 0 }}>
-        {active && <Check size={13} color="#1890ff" />}
+        {active && <CheckOutlined style={{ fontSize: 13, color: '#1890ff' }} />}
       </div>
       {label}
     </div>
@@ -222,39 +227,27 @@ function CombinationItem({ combo, active, onSelect, onEdit, onDelete }: {
         }}
       >
         <div style={{ width: 14, flexShrink: 0, lineHeight: 0 }}>
-          {active && <Check size={13} color="#1890ff" />}
+          {active && <CheckOutlined style={{ fontSize: 13, color: '#1890ff' }} />}
         </div>
         <span>{combo.name}</span>
       </div>
       <div style={{ display: 'flex', gap: 2, paddingRight: 8, opacity: hov ? 1 : 0, transition: 'opacity 0.15s' }}>
-        <MiniBtn onClick={e => { e.stopPropagation(); onEdit(); }}>
-          <Edit2 size={13} />
-        </MiniBtn>
-        <MiniBtn onClick={e => { e.stopPropagation(); onDelete(); }} danger>
-          <Trash2 size={13} />
-        </MiniBtn>
+        <Button
+          type="text"
+          size="small"
+          icon={<EditOutlined />}
+          onClick={e => { e.stopPropagation(); onEdit(); }}
+          style={{ color: '#bbb', padding: 4 }}
+        />
+        <Button
+          type="text"
+          size="small"
+          danger
+          icon={<DeleteOutlined />}
+          onClick={e => { e.stopPropagation(); onDelete(); }}
+          style={{ padding: 4 }}
+        />
       </div>
-    </div>
-  );
-}
-
-function MiniBtn({ onClick, danger, children }: {
-  onClick: (e: React.MouseEvent) => void; danger?: boolean; children: React.ReactNode;
-}) {
-  const [hov, setHov] = useState(false);
-  return (
-    <div
-      onClick={onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        lineHeight: 0, padding: 4, borderRadius: 4, cursor: 'pointer',
-        color: hov ? (danger ? '#ff4d4f' : '#1890ff') : '#bbb',
-        background: hov ? (danger ? '#fff1f0' : '#e6f7ff') : 'transparent',
-        transition: 'all 0.12s',
-      }}
-    >
-      {children}
     </div>
   );
 }
@@ -306,7 +299,7 @@ function MetricCascadeSelect({ value, onChange }: {
           width: 148, padding: '5px 8px',
           border: `1px solid ${open ? '#1890ff' : '#d9d9d9'}`,
           borderRadius: 4, cursor: 'pointer', fontSize: 13,
-          background: '#fff', flexShrink: 0, gap: 4, fontFamily: F,
+          background: '#fff', flexShrink: 0, gap: 4,
           boxSizing: 'border-box',
         }}
       >
@@ -334,7 +327,6 @@ function MetricCascadeSelect({ value, onChange }: {
             boxShadow: '0 6px 24px rgba(0,0,0,0.16)',
             border: '1px solid #e8e8e8',
             overflow: 'hidden',
-            fontFamily: F,
           }}
         >
           {/* Left: categories */}
@@ -377,7 +369,7 @@ function MetricCascadeSelect({ value, onChange }: {
                 }}
               >
                 <span>{m.label}</span>
-                {value === m.key && <Check size={11} color="#1890ff" />}
+                {value === m.key && <CheckOutlined style={{ fontSize: 11, color: '#1890ff' }} />}
               </div>
             ))}
           </div>
@@ -434,125 +426,81 @@ export function MetricFilterEditModal({ initial, onSave, onClose }: EditModalPro
     onSave({ id: initial?.id ?? genId(), name: name.trim(), groups });
   };
 
-  return ReactDOM.createPortal(
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 99999,
-        background: 'rgba(0,0,0,0.35)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: F,
-      }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div style={{
-        background: '#fff', borderRadius: 8, width: 680,
-        maxHeight: '82vh', display: 'flex', flexDirection: 'column',
-        boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
-      }}>
-        {/* Header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '16px 20px', borderBottom: '1px solid #f0f0f0', flexShrink: 0,
-        }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#222' }}>
-            {initial ? '编辑筛选组合' : '新建筛选组合'}
-          </span>
-          <div style={{ cursor: 'pointer', lineHeight: 0 }} onClick={onClose}>
-            <X size={18} color="#999" />
-          </div>
-        </div>
-
-        {/* Body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px' }}>
-          {/* Name */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 13, color: '#555', marginBottom: 6 }}>
-              组合名称 <span style={{ color: '#ff4d4f' }}>*</span>
-            </div>
-            <input
-              autoFocus
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="请输入组合名称，如「高消耗ROI达标」"
-              style={{
-                width: '100%', boxSizing: 'border-box',
-                border: `1px solid ${name.trim() ? '#d9d9d9' : '#ff4d4f'}`,
-                borderRadius: 4, padding: '7px 10px', fontSize: 13,
-                outline: 'none', transition: 'border-color 0.2s',
-                fontFamily: F,
-              }}
-              onFocus={e => (e.currentTarget.style.borderColor = '#1890ff')}
-              onBlur={e => (e.currentTarget.style.borderColor = name.trim() ? '#d9d9d9' : '#ff4d4f')}
-            />
-          </div>
-
-          {/* Condition groups */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {groups.map((group, gi) => (
-              <React.Fragment key={group.id}>
-                {gi > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0' }}>
-                    <div style={{ flex: 1, height: 1, background: '#eee' }} />
-                    <span style={{
-                      fontSize: 11, color: '#fff', background: '#fa8c16',
-                      padding: '2px 10px', borderRadius: 10, fontWeight: 700, letterSpacing: 1,
-                    }}>OR</span>
-                    <div style={{ flex: 1, height: 1, background: '#eee' }} />
-                  </div>
-                )}
-                <GroupCard
-                  group={group}
-                  canRemove={groups.length > 1}
-                  onRemove={() => removeGroup(group.id)}
-                  onAddCondition={() => addCondition(group.id)}
-                  onUpdateCondition={(cid, patch) => updateCondition(group.id, cid, patch)}
-                  onRemoveCondition={cid => removeCondition(group.id, cid)}
-                />
-              </React.Fragment>
-            ))}
-          </div>
-
-          {/* Add group */}
-          <div
-            onClick={addGroup}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              color: '#1890ff', cursor: 'pointer', fontSize: 13,
-              marginTop: 14, padding: '6px 10px', borderRadius: 4,
-              border: '1px dashed #91caff', background: '#f0f7ff',
-            }}
-            onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = '#e6f7ff'}
-            onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = '#f0f7ff'}
+  return (
+    <Modal
+      open
+      title={initial ? '编辑筛选组合' : '新建筛选组合'}
+      onCancel={onClose}
+      width={680}
+      styles={{ body: { maxHeight: '60vh', overflowY: 'auto', padding: '18px 20px' } }}
+      footer={
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <Button onClick={onClose}>取消</Button>
+          <Button
+            type="primary"
+            disabled={!canSave}
+            onClick={handleSave}
           >
-            <Plus size={13} />
-            <span>添加条件组（条件组之间为 OR 关系）</span>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div style={{
-          display: 'flex', justifyContent: 'flex-end', gap: 8,
-          padding: '12px 20px', borderTop: '1px solid #f0f0f0', flexShrink: 0,
-        }}>
-          <button onClick={onClose} style={btnStyle('cancel')}>取消</button>
-          <button onClick={handleSave} disabled={!canSave} style={btnStyle(canSave ? 'primary' : 'disabled')}>
             保存
-          </button>
+          </Button>
         </div>
+      }
+    >
+      {/* Name */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 13, color: '#555', marginBottom: 6 }}>
+          组合名称 <span style={{ color: '#ff4d4f' }}>*</span>
+        </div>
+        <Input
+          autoFocus
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder="请输入组合名称，如「高消耗ROI达标」"
+          status={name.trim() ? undefined : 'error'}
+          style={{ fontSize: 13 }}
+        />
       </div>
-    </div>,
-    document.body
-  );
-}
 
-function btnStyle(type: 'cancel' | 'primary' | 'disabled'): React.CSSProperties {
-  const base: React.CSSProperties = {
-    padding: '6px 22px', borderRadius: 4, fontSize: 13,
-    fontFamily: F, border: 'none', transition: 'all 0.15s',
-  };
-  if (type === 'cancel')  return { ...base, background: '#fff', color: '#555', border: '1px solid #d9d9d9', cursor: 'pointer' };
-  if (type === 'primary') return { ...base, background: '#1890ff', color: '#fff', cursor: 'pointer' };
-  return { ...base, background: '#bae7ff', color: '#fff', cursor: 'not-allowed' };
+      {/* Condition groups */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+        {groups.map((group, gi) => (
+          <React.Fragment key={group.id}>
+            {gi > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0' }}>
+                <div style={{ flex: 1, height: 1, background: '#eee' }} />
+                <span style={{
+                  fontSize: 11, color: '#fff', background: '#fa8c16',
+                  padding: '2px 10px', borderRadius: 10, fontWeight: 700, letterSpacing: 1,
+                }}>OR</span>
+                <div style={{ flex: 1, height: 1, background: '#eee' }} />
+              </div>
+            )}
+            <GroupCard
+              group={group}
+              canRemove={groups.length > 1}
+              onRemove={() => removeGroup(group.id)}
+              onAddCondition={() => addCondition(group.id)}
+              onUpdateCondition={(cid, patch) => updateCondition(group.id, cid, patch)}
+              onRemoveCondition={cid => removeCondition(group.id, cid)}
+            />
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* Add group */}
+      <Button
+        type="dashed"
+        icon={<PlusOutlined />}
+        onClick={addGroup}
+        style={{
+          marginTop: 14, fontSize: 13,
+          color: '#1890ff', borderColor: '#91caff', background: '#f0f7ff',
+        }}
+      >
+        添加条件组（条件组之间为 OR 关系）
+      </Button>
+    </Modal>
+  );
 }
 
 // ── Group card ─────────────────────────────────────────────────
@@ -582,15 +530,15 @@ function GroupCard({ group, canRemove, onRemove, onAddCondition, onUpdateConditi
           <span style={{ fontSize: 12, color: '#aaa' }}>组内条件全部满足</span>
         </div>
         {canRemove && (
-          <div
-            onClick={onRemove}
+          <Button
+            type="text"
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
             title="删除该条件组"
-            style={{ cursor: 'pointer', lineHeight: 0, color: '#ccc', padding: 2, borderRadius: 3 }}
-            onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.color = '#ff4d4f'}
-            onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.color = '#ccc'}
-          >
-            <Trash2 size={14} />
-          </div>
+            onClick={onRemove}
+            style={{ color: '#ccc', padding: 2 }}
+          />
         )}
       </div>
 
@@ -608,20 +556,21 @@ function GroupCard({ group, canRemove, onRemove, onAddCondition, onUpdateConditi
       </div>
 
       {/* Add condition */}
-      <div
+      <Button
+        type="link"
+        size="small"
+        icon={<PlusOutlined />}
         onClick={onAddCondition}
         style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
-          color: '#1890ff', cursor: 'pointer', fontSize: 12,
           marginTop: 10, paddingTop: 8,
           borderTop: '1px dashed #e8e8e8', width: '100%',
+          fontSize: 12, color: '#1890ff',
+          display: 'flex', alignItems: 'center',
+          borderRadius: 0,
         }}
-        onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.color = '#096dd9'}
-        onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.color = '#1890ff'}
       >
-        <Plus size={12} />
-        <span>添加条件</span>
-      </div>
+        添加条件
+      </Button>
     </div>
   );
 }
@@ -637,8 +586,6 @@ function ConditionRow({ condition, canRemove, onChange, onRemove }: {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      {/* No AND badge — just spacing to align all rows */}
-
       {/* Metric — cascading selector */}
       <MetricCascadeSelect
         value={condition.metricKey}
@@ -646,62 +593,56 @@ function ConditionRow({ condition, canRemove, onChange, onRemove }: {
       />
 
       {/* Operator */}
-      <select
+      <Select
         value={condition.operator}
-        onChange={e => onChange({ operator: e.target.value as MetricOperator })}
-        style={{
-          width: 72, border: '1px solid #d9d9d9', borderRadius: 4,
-          padding: '5px 6px', fontSize: 13, outline: 'none',
-          background: '#fff', cursor: 'pointer', flexShrink: 0, fontFamily: F,
-        }}
-      >
-        {OPERATORS.map(op => (
-          <option key={op.key} value={op.key}>{op.label}</option>
-        ))}
-      </select>
+        onChange={val => onChange({ operator: val as MetricOperator })}
+        style={{ width: 72, fontSize: 13, flexShrink: 0 }}
+        size="middle"
+        options={OPERATORS.map(op => ({ value: op.key, label: op.label }))}
+      />
 
       {/* Value(s) */}
       {isBetween ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <NumInput value={condition.value}  onChange={v => onChange({ value: v })} />
+          <InputNumber
+            value={condition.value === 0 ? undefined : condition.value}
+            placeholder="0"
+            onChange={v => onChange({ value: v ?? 0 })}
+            style={{ width: 88, fontSize: 13, flexShrink: 0 }}
+            controls={false}
+          />
           <span style={{ fontSize: 12, color: '#aaa', flexShrink: 0 }}>~</span>
-          <NumInput value={condition.value2} onChange={v => onChange({ value2: v })} />
+          <InputNumber
+            value={condition.value2 === 0 ? undefined : condition.value2}
+            placeholder="0"
+            onChange={v => onChange({ value2: v ?? 0 })}
+            style={{ width: 88, fontSize: 13, flexShrink: 0 }}
+            controls={false}
+          />
         </div>
       ) : (
-        <NumInput value={condition.value} onChange={v => onChange({ value: v })} />
+        <InputNumber
+          value={condition.value === 0 ? undefined : condition.value}
+          placeholder="0"
+          onChange={v => onChange({ value: v ?? 0 })}
+          style={{ width: 88, fontSize: 13, flexShrink: 0 }}
+          controls={false}
+        />
       )}
 
       {/* Remove */}
       <div style={{ width: 20, flexShrink: 0 }}>
         {canRemove && (
-          <div
+          <Button
+            type="text"
+            size="small"
+            danger
             onClick={onRemove}
-            style={{ cursor: 'pointer', lineHeight: 0, color: '#ccc' }}
-            onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.color = '#ff4d4f'}
-            onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.color = '#ccc'}
-          >
-            <X size={14} />
-          </div>
+            style={{ color: '#ccc', padding: 0, height: 'auto', lineHeight: 1 }}
+            icon={<span style={{ fontSize: 14 }}>×</span>}
+          />
         )}
       </div>
     </div>
-  );
-}
-
-function NumInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  return (
-    <input
-      type="number"
-      value={value === 0 ? '' : value}
-      placeholder="0"
-      onChange={e => onChange(e.target.value === '' ? 0 : Number(e.target.value))}
-      style={{
-        width: 88, border: '1px solid #d9d9d9', borderRadius: 4,
-        padding: '5px 8px', fontSize: 13, outline: 'none', flexShrink: 0,
-        fontFamily: F,
-      }}
-      onFocus={e => (e.currentTarget.style.borderColor = '#1890ff')}
-      onBlur={e => (e.currentTarget.style.borderColor = '#d9d9d9')}
-    />
   );
 }

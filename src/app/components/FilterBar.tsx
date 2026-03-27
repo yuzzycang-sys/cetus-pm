@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Filter, Calendar } from 'lucide-react';
+import { Button, Divider } from 'antd';
 import { AllFiltersPopover } from './AllFiltersPopover';
 import { DateRangePicker } from './DateRangePicker';
 import { PriceRangePicker } from './PriceRangePicker';
@@ -8,7 +9,7 @@ import { AccountInputChip } from './AccountInputChip';
 const TEXT_INPUT_KEYS = new Set(['accountId', 'adId']);
 import { FILTER_CHIP_DATA } from './filterConfig';
 
-const F = "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif";
+const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
 
 interface Props {
   activeFilters: string[];
@@ -91,48 +92,46 @@ export function FilterBar({
       overflowX: 'auto', overflowY: 'hidden',
     }}>
       {/* ── 所有筛选 ── */}
-      <button
+      <Button
         ref={filterBtnRef}
         onClick={handleOpenAllFilters}
+        size="small"
+        type={showAllFilters ? 'primary' : 'default'}
+        ghost={showAllFilters}
+        icon={<Filter size={13} />}
         style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          border: `1px solid ${showAllFilters ? '#3370ff' : '#dee0e3'}`,
-          borderRadius: 4, padding: '0 12px', height: 28,
-          background: showAllFilters ? '#e8f0ff' : '#fff',
-          cursor: 'pointer', fontSize: 13,
-          color: showAllFilters ? '#3370ff' : '#1f2329',
-          outline: 'none', flexShrink: 0, marginRight: 10,
+          display: 'inline-flex', alignItems: 'center',
+          height: 28, fontSize: 13, flexShrink: 0, marginRight: 10,
         }}
       >
-        <Filter size={13} color={showAllFilters ? '#3370ff' : '#8f959e'} />
-        <span>所有筛选</span>
-      </button>
+        所有筛选
+      </Button>
 
       {/* ── 消耗时间（permanent，无竖线） ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginRight: 10 }}>
-        <span style={{ fontSize: 13, color: '#646a73', whiteSpace: 'nowrap' }}>消耗时间</span>
-        <button
+        <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>消耗时间</span>
+        <Button
           ref={dateBtnRef}
           onClick={handleOpenDatePicker}
+          size="small"
+          type="default"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
-            border: `1px solid ${showDatePicker ? '#3370ff' : '#dee0e3'}`,
-            borderRadius: 4, padding: '0 10px', height: 28,
-            background: '#fff', cursor: 'pointer', fontSize: 13,
-            color: '#1f2329', outline: 'none', whiteSpace: 'nowrap',
+            height: 28, fontSize: 13, whiteSpace: 'nowrap',
+            borderColor: showDatePicker ? '#1677ff' : undefined,
           }}
         >
           <span>{dateStart}</span>
           <span style={{ color: '#bbb' }}>→</span>
           <span>{dateEnd}</span>
           <Calendar size={12} color="#aaa" />
-        </button>
+        </Button>
       </div>
 
       {/* ── Active filter chips（有竖分割线） ── */}
       {activeFilters.length > 0 && (
         <>
-          <div style={{ width: 1, height: 20, background: '#dee0e3', flexShrink: 0, marginRight: 10 }} />
+          <Divider type="vertical" style={{ height: 20, marginRight: 10 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {activeFilters.map(key => {
               const cfg = FILTER_CHIP_DATA[key];
@@ -140,18 +139,17 @@ export function FilterBar({
                 // Special case for priceRange
                 if (key === 'priceRange') {
                   return (
-                    <button
+                    <Button
                       key={key}
                       ref={priceBtnRef}
                       onClick={handleOpenPriceRange}
+                      size="small"
+                      type="default"
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 4,
-                        border: `1px solid ${priceRangeActive ? '#1890ff' : (showPriceRange ? '#3370ff' : '#dee0e3')}`,
-                        borderRadius: 4, padding: '0 8px', height: 28,
-                        background: priceRangeActive ? '#e6f7ff' : '#fff',
-                        cursor: 'pointer', fontSize: 13,
-                        whiteSpace: 'nowrap', outline: 'none',
-                        transition: 'all 0.15s',
+                        height: 28, fontSize: 13, whiteSpace: 'nowrap',
+                        borderColor: priceRangeActive ? '#1890ff' : (showPriceRange ? '#1677ff' : undefined),
+                        background: priceRangeActive ? '#e6f7ff' : undefined,
                       }}
                     >
                       <span style={{ color: '#555' }}>出价范围:</span>
@@ -161,7 +159,7 @@ export function FilterBar({
                       }}>
                         {priceRangeSummary}
                       </span>
-                    </button>
+                    </Button>
                   );
                 }
                 return null;

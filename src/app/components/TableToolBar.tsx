@@ -1,12 +1,11 @@
 import React, { useState, useRef } from 'react';
+import { Button, Radio, Divider, Space } from 'antd';
 import { Settings2, Columns3, Filter, LayoutList, LayoutGrid } from 'lucide-react';
 import { AggregateDimensionPopover } from './AggregateDimensionPopover';
 import { MetricFilterPopover, MetricFilterEditModal } from './MetricFilterPopover';
 import { LocalFilterPopover } from './LocalFilterPopover';
 import type { FilterCombination } from './MetricFilterPopover';
 import type { LocalFilters } from './LocalFilterPopover';
-
-const F = "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif";
 
 interface Props {
   timeGranularity: 'day' | 'week' | 'month';
@@ -96,42 +95,31 @@ export function TableToolBar({
 
   const localFilterCount = Object.keys(localFilters).length;
 
-  const GRAN_OPTS: { key: 'day' | 'week' | 'month'; label: string }[] = [
-    { key: 'day',   label: '日' },
-    { key: 'week',  label: '周' },
-    { key: 'month', label: '月' },
-  ];
-
   return (
     <>
       <div style={{
         height: 40, display: 'flex', alignItems: 'center',
-        borderBottom: '1px solid #dee0e3', padding: '0 16px',
-        background: 'transparent', flexShrink: 0, fontFamily: F,
+        borderBottom: '1px solid #d9d9d9', padding: '0 16px',
+        background: 'transparent', flexShrink: 0,
         justifyContent: 'space-between',
       }}>
         {/* Left */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Space size={4} align="center">
           {/* Time granularity */}
-          <span style={{ fontSize: 12, color: '#646a73', marginRight: 4 }}>时度</span>
-          <div style={{ display: 'flex', border: '1px solid #dee0e3', borderRadius: 4, overflow: 'hidden' }}>
-            {GRAN_OPTS.map(opt => (
-              <div
-                key={opt.key}
-                onClick={() => onChangeGranularity(opt.key)}
-                style={{
-                  padding: '4px 10px', fontSize: 12, cursor: 'pointer',
-                  background: timeGranularity === opt.key ? '#3370ff' : '#fff',
-                  color: timeGranularity === opt.key ? '#fff' : '#646a73',
-                  borderRight: opt.key !== 'month' ? '1px solid #dee0e3' : 'none',
-                }}
-              >
-                {opt.label}
-              </div>
-            ))}
-          </div>
+          <span style={{ fontSize: 12, color: '#595959' }}>时度</span>
+          <Radio.Group
+            size="small"
+            value={timeGranularity}
+            onChange={e => onChangeGranularity(e.target.value)}
+            optionType="button"
+            buttonStyle="solid"
+          >
+            <Radio.Button value="day">日</Radio.Button>
+            <Radio.Button value="week">周</Radio.Button>
+            <Radio.Button value="month">月</Radio.Button>
+          </Radio.Group>
 
-          <div style={{ width: 1, height: 16, background: '#dee0e3', margin: '0 4px' }} />
+          <Divider type="vertical" style={{ margin: '0 4px' }} />
 
           {/* Aggregate dimension */}
           <div ref={aggDimRef} style={{ position: 'relative' }}>
@@ -180,41 +168,32 @@ export function TableToolBar({
               active={showLocalFilter || localFilterCount > 0}
             />
           </div>
-        </div>
+        </Space>
 
         {/* Right */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ display: 'flex', border: '1px solid #dee0e3', borderRadius: 6, overflow: 'hidden' }}>
-            <div
-              onClick={() => onChangeMergeView(false)}
-              title="普通视图"
-              style={{ padding: '4px 8px', cursor: 'pointer', lineHeight: 0, background: !mergeView ? '#e8f0ff' : '#fff' }}
-            >
-              <LayoutList size={14} color={!mergeView ? '#3370ff' : '#8f959e'} />
-            </div>
-            <div
-              onClick={() => onChangeMergeView(true)}
-              title="聚合视图"
-              style={{ padding: '4px 8px', cursor: 'pointer', lineHeight: 0, borderLeft: '1px solid #dee0e3', background: mergeView ? '#e8f0ff' : '#fff' }}
-            >
-              <LayoutGrid size={14} color={mergeView ? '#3370ff' : '#8f959e'} />
-            </div>
-          </div>
-
-          <button
-            onClick={onQuery}
-            style={{ padding: '0 16px', height: 28, background: '#3370ff', color: '#fff', border: 'none', borderRadius: 4, fontSize: 13, cursor: 'pointer', fontFamily: F }}
+        <Space size={8} align="center">
+          <Radio.Group
+            size="small"
+            value={mergeView ? 'merge' : 'normal'}
+            onChange={e => onChangeMergeView(e.target.value === 'merge')}
+            optionType="button"
           >
+            <Radio.Button value="normal" title="普通视图" style={{ lineHeight: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+              <LayoutList size={14} />
+            </Radio.Button>
+            <Radio.Button value="merge" title="聚合视图" style={{ lineHeight: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+              <LayoutGrid size={14} />
+            </Radio.Button>
+          </Radio.Group>
+
+          <Button type="primary" size="middle" onClick={onQuery} style={{ padding: '0 16px' }}>
             查询
-          </button>
+          </Button>
 
-          <button
-            onClick={onExport}
-            style={{ padding: '0 16px', height: 28, background: '#fff', color: '#3370ff', border: '1px solid #3370ff', borderRadius: 4, fontSize: 13, cursor: 'pointer', fontFamily: F }}
-          >
+          <Button size="middle" onClick={onExport} style={{ padding: '0 16px' }}>
             导出
-          </button>
-        </div>
+          </Button>
+        </Space>
       </div>
 
       {/* Metric filter dropdown */}
@@ -259,23 +238,22 @@ function ToolbarBtn({ icon, label, onClick, active }: {
   onClick: () => void;
   active?: boolean;
 }) {
-  const [hovered, setHovered] = useState(false);
   return (
-    <div
+    <Button
+      type={active ? 'primary' : 'text'}
+      ghost={active}
+      size="middle"
+      icon={icon}
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       style={{
-        display: 'flex', alignItems: 'center', gap: 4,
-        padding: '4px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 13,
-        color: active || hovered ? '#3370ff' : '#646a73',
-        background: active ? '#e8f0ff' : hovered ? '#f5f6f7' : 'transparent',
-        border: `1px solid ${active ? '#3370ff' : 'transparent'}`,
         maxWidth: 220,
+        display: 'inline-flex',
+        alignItems: 'center',
       }}
     >
-      {icon}
-      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
-    </div>
+      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {label}
+      </span>
+    </Button>
   );
 }

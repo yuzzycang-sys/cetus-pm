@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ExportModal } from './components/ExportModal';
 import { Toaster, toast } from 'sonner';
 import { Lock } from 'lucide-react';
 import { TopNav } from './components/TopNav';
@@ -17,7 +18,7 @@ import type { FilterCombination } from './components/MetricFilterPopover';
 import type { LocalFilters } from './components/LocalFilterPopover';
 import type { ShareMode } from './components/ShareViewModal';
 
-const F = "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif";
+const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
 
 // ── Permission system constants ────────────────────────────────
 const CURRENT_USER = '张三';
@@ -225,8 +226,8 @@ function NoPermissionView({ missingTagsInfo }: { missingTagsInfo: TagInfo[] }) {
       }}>
         <Lock size={28} color="#ff4d4f" />
       </div>
-      <div style={{ fontSize: 16, fontWeight: 600, color: '#1f2329' }}>无法加载此视图</div>
-      <div style={{ fontSize: 13, color: '#8f959e', textAlign: 'center', maxWidth: 380 }}>
+      <div style={{ fontSize: 16, fontWeight: 600, color: '#141414' }}>无法加载此视图</div>
+      <div style={{ fontSize: 13, color: '#8c8c8c', textAlign: 'center', maxWidth: 380 }}>
         当前视图包含您无权访问的快捷标签。请联系标签所有者开放权限，或请视图创建者调整标签配置。
       </div>
       <div style={{ width: '100%', maxWidth: 400 }}>
@@ -276,6 +277,9 @@ export default function App() {
   const [mergeView, setMergeView] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(30);
+
+  // Export modal
+  const [isExportModalVisible, setIsExportModalVisible] = useState(false);
 
   // ── Permission system state ──────────────────────────────
   const [pageStatus, setPageStatus] = useState<PageStatus>({ type: 'OK' });
@@ -486,7 +490,7 @@ export default function App() {
   return (
     <div style={{
       width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column',
-      fontFamily: F, fontSize: 13, color: '#1f2329', background: '#fff', overflow: 'hidden',
+      fontFamily: F, fontSize: 13, color: '#141414', background: '#fff', overflow: 'hidden',
     }}>
       <Toaster position="top-center" duration={2000} expand={true} gap={8} toastOptions={{ style: { background: 'rgba(0,0,0,0.75)', color: '#fff', borderRadius: 6, padding: '8px 16px', fontSize: 13, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', textAlign: 'center', width: 'fit-content', margin: '0 auto' } }} />
       <TopNav />
@@ -601,7 +605,7 @@ export default function App() {
                 onQuery={() => {
                   if (currentSheetState.activeDims.length > 0) updateSheetState({ hasData: true });
                 }}
-                onExport={() => {}}
+                onExport={() => setIsExportModalVisible(true)}
                 filterCombinations={currentSheetState.filterCombinations}
                 activeFilterId={currentSheetState.activeFilterId}
                 onSelectFilter={id => updateSheetState({ activeFilterId: id })}
@@ -650,6 +654,18 @@ export default function App() {
           onClose={() => setShowTagModal(false)}
         />
       )}
+
+      <ExportModal
+        open={isExportModalVisible}
+        onClose={() => setIsExportModalVisible(false)}
+        sheets={sheets}
+        activeSheet={activeSheet}
+        dateStart={dateStart}
+        dateEnd={dateEnd}
+        activeFilters={activeFilters}
+        filterSelections={filterSelections}
+        priceRange={priceRange}
+      />
 
       {/* ── Scene 1: Tag permission alignment dialog ── */}
       {pendingShareAction && (

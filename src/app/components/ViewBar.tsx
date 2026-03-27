@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { ChevronDown, Pin, Search } from 'lucide-react';
+import { Button, Divider } from 'antd';
 import { ViewSelectorDropdown, ViewItem } from './ViewSelectorDropdown';
 import { SaveMenu } from './SaveMenu';
 import { UpdateViewModal } from './UpdateViewModal';
@@ -7,7 +8,7 @@ import { SaveAsNewViewModal } from './SaveAsNewViewModal';
 import { ShareViewModal } from './ShareViewModal';
 import type { ShareMode } from './ShareViewModal';
 
-const F = "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif";
+const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
 
 interface Props {
   views: ViewItem[];
@@ -49,7 +50,7 @@ export function ViewBar({
       }}>
         {/* Select view button */}
         <div ref={selectorRef} style={{ position: 'relative' }}>
-          <button
+          <Button
             onClick={() => {
               if (showSelector) { setShowSelector(false); return; }
               if (selectorRef.current) {
@@ -58,11 +59,12 @@ export function ViewBar({
               }
               setShowSelector(true);
             }}
+            size="small"
+            type="default"
             style={{
               display: 'flex', alignItems: 'center', gap: 5,
-              border: '1px solid #dee0e3', borderRadius: 4, padding: '0 10px', height: 28,
-              background: '#fff', cursor: 'pointer', fontSize: 13,
-              color: selectedView ? '#1f2329' : '#8f959e',
+              height: 28, fontSize: 13,
+              color: selectedView ? '#141414' : '#8c8c8c',
               width: 160,
             }}
           >
@@ -71,7 +73,7 @@ export function ViewBar({
               {selectedView || '选择视图'}
             </span>
             <ChevronDown size={12} color="#aaa" style={{ flexShrink: 0 }} />
-          </button>
+          </Button>
 
           {showSelector && selectorPos && (
             <ViewSelectorDropdown
@@ -89,12 +91,13 @@ export function ViewBar({
 
         {/* Save button */}
         <div ref={saveMenuRef} style={{ position: 'relative' }}>
-          <span
+          <Button
+            type="link"
             onClick={() => setShowSaveMenu(v => !v)}
-            style={{ fontSize: 13, color: '#3370ff', cursor: 'pointer', userSelect: 'none' }}
+            style={{ fontSize: 13, padding: 0, height: 'auto' }}
           >
             保存
-          </span>
+          </Button>
           {showSaveMenu && (
             <SaveMenu
               selectedView={selectedView}
@@ -108,10 +111,10 @@ export function ViewBar({
         </div>
 
         {/* Divider — LEFT of pin icon */}
-        <div style={{ width: 1, height: 18, background: '#dee0e3', margin: '0 6px' }} />
+        <Divider type="vertical" style={{ height: 18, margin: '0 6px' }} />
 
         {/* Pin icon */}
-        <Pin size={14} color="#3370ff" fill="#3370ff" style={{ cursor: 'default', flexShrink: 0 }} />
+        <Pin size={14} color="#1677ff" fill="#1677ff" style={{ cursor: 'default', flexShrink: 0 }} />
 
         {/* Pinned view tags */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, overflow: 'hidden' }}>
@@ -167,22 +170,18 @@ export function ViewBar({
 }
 
 function PinnedTag({ name, active, onClick }: { name: string; active: boolean; onClick: () => void }) {
-  const [hovered, setHovered] = useState(false);
   return (
-    <div
+    <Button
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      size="small"
+      type={active ? 'primary' : 'default'}
+      ghost={active}
       style={{
-        padding: '0 10px', height: 28, display: 'flex', alignItems: 'center',
-        borderRadius: 4, fontSize: 13, cursor: 'pointer',
-        border: `1px solid ${active ? '#3370ff' : '#dee0e3'}`,
-        background: active ? '#e8f0ff' : hovered ? '#f5f6f7' : '#fff',
-        color: active ? '#3370ff' : '#646a73',
+        height: 28, fontSize: 13,
         whiteSpace: 'nowrap',
       }}
     >
       {name}
-    </div>
+    </Button>
   );
 }

@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { Search, Pin, Check, Share2 } from 'lucide-react';
-
-const F = "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif";
+import { Pin, Check, Share2 } from 'lucide-react';
+import { Input, Button, Tabs } from 'antd';
+import { SearchOutlined } from '@ant-design/icons';
 
 export type ViewItem = {
   id: string;
@@ -12,6 +12,7 @@ export type ViewItem = {
   pinned: boolean;
   shareMode?: 'private' | 'specific' | 'public';
   sharedWith?: string[];
+  tag_ids?: string[];
 };
 
 type Tab = 'all' | 'mine' | 'pinned' | 'shared';
@@ -54,8 +55,8 @@ export function ViewSelectorDropdown({ views, selectedView, onSelect, onTogglePi
   });
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'all', label: '所有' },
-    { key: 'mine', label: '我的' },
+    { key: 'all',    label: '所有' },
+    { key: 'mine',   label: '我的' },
     { key: 'pinned', label: '置顶' },
     { key: 'shared', label: '共享' },
   ];
@@ -67,45 +68,29 @@ export function ViewSelectorDropdown({ views, selectedView, onSelect, onTogglePi
         position: 'fixed', top: fixedTop, left: fixedLeft, zIndex: 99999,
         width: 350, background: '#fff', borderRadius: 8,
         boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-        fontFamily: F,
       }}
     >
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid #e8e8e8' }}>
-        {tabs.map(t => (
-          <div
-            key={t.key}
-            onClick={() => setActiveTab(t.key)}
-            style={{
-              flex: 1, textAlign: 'center', padding: '9px 0',
-              fontSize: 13, cursor: 'pointer',
-              color: activeTab === t.key ? '#1890ff' : '#666',
-              borderBottom: activeTab === t.key ? '2px solid #1890ff' : '2px solid transparent',
-              fontWeight: activeTab === t.key ? 500 : 400,
-            }}
-          >
-            {t.label}
-          </div>
-        ))}
-      </div>
+      <Tabs
+        activeKey={activeTab}
+        onChange={key => setActiveTab(key as Tab)}
+        size="small"
+        style={{ marginBottom: 0 }}
+        tabBarStyle={{ margin: 0, paddingLeft: 8, paddingRight: 8 }}
+        items={tabs.map(t => ({ key: t.key, label: t.label }))}
+      />
 
       {/* Search */}
       <div style={{ padding: '8px 12px' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          background: '#f5f5f5', borderRadius: 4, padding: '5px 8px',
-        }}>
-          <Search size={13} color="#aaa" />
-          <input
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            placeholder="搜索视图名称"
-            style={{
-              border: 'none', background: 'transparent', outline: 'none',
-              fontSize: 12, color: '#333', flex: 1,
-            }}
-          />
-        </div>
+        <Input
+          size="small"
+          prefix={<SearchOutlined style={{ color: '#aaa', fontSize: 13 }} />}
+          value={searchText}
+          onChange={e => setSearchText(e.target.value)}
+          placeholder="搜索视图名称"
+          style={{ fontSize: 12, background: '#f5f5f5', borderColor: 'transparent' }}
+          variant="filled"
+        />
       </div>
 
       {/* List */}
@@ -186,21 +171,20 @@ function ViewRow({ view, isSelected, pinLimitReached, onSelect, onTogglePin, onS
         <span style={{ fontSize: 11, color: '#aaa', marginRight: 6 }}>{ownerLabel}</span>
       )}
 
-      {/* Share icon — only for 'mine' views, visible on hover or already shared */}
+      {/* Share button — only for 'mine' views, visible on hover or already shared */}
       {view.type === 'mine' && (hovered || isShared) && (
-        <div
-          onClick={e => { e.stopPropagation(); onShareView(); }}
+        <Button
+          type="text"
+          size="small"
           title="共享设置"
+          onClick={e => { e.stopPropagation(); onShareView(); }}
           style={{
-            lineHeight: 0, marginRight: 6, cursor: 'pointer',
+            padding: '0 4px', marginRight: 2, height: 'auto',
             color: isShared ? '#1890ff' : '#bbb',
-            transition: 'color 0.15s',
+            lineHeight: 1,
           }}
-          onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.color = '#1890ff'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.color = isShared ? '#1890ff' : '#bbb'; }}
-        >
-          <Share2 size={13} />
-        </div>
+          icon={<Share2 size={13} />}
+        />
       )}
 
       {/* Pin button */}
@@ -213,11 +197,20 @@ function ViewRow({ view, isSelected, pinLimitReached, onSelect, onTogglePin, onS
           if (!pinLimitReached) onTogglePin();
         }}
       >
-        <Pin
-          size={13}
-          color={view.pinned ? '#1890ff' : pinLimitReached ? '#ccc' : '#aaa'}
-          fill={view.pinned ? '#1890ff' : 'none'}
-          style={{ cursor: pinLimitReached ? 'not-allowed' : 'pointer' }}
+        <Button
+          type="text"
+          size="small"
+          style={{
+            padding: '0 2px', height: 'auto', lineHeight: 1,
+            color: view.pinned ? '#1890ff' : pinLimitReached ? '#ccc' : '#aaa',
+            cursor: pinLimitReached ? 'not-allowed' : 'pointer',
+          }}
+          icon={
+            <Pin
+              size={13}
+              fill={view.pinned ? '#1890ff' : 'none'}
+            />
+          }
         />
         {showPinTooltip && (
           <div style={{

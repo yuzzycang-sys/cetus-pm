@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { ArrowUpDown, Inbox } from 'lucide-react';
+import { Table, Tooltip } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import { Inbox } from 'lucide-react';
 import type { FilterCombination } from './MetricFilterPopover';
 
-const F = "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif";
+const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
 
 type Row = {
   id: string;
@@ -134,7 +136,6 @@ interface Props {
 
 export function DataTable({ activeDims, hasData, activeFilter, mergeView }: Props) {
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
-  const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
 
   // Apply metric filter
   const rows: Row[] = !hasData
@@ -148,11 +149,6 @@ export function DataTable({ activeDims, hasData, activeFilter, mergeView }: Prop
   const DIM_COLS: DimCol[] = activeDims
     .filter(k => !!DIM_COL_MAP[k])
     .map(k => ({ dimKey: k, ...DIM_COL_MAP[k] }));
-
-  const DIM_LEFT: number[] = DIM_COLS.map((_, i) =>
-    DIM_COLS.slice(0, i).reduce((s, c) => s + c.width, 0)
-  );
-  const LAST_DIM = DIM_COLS.length - 1;
 
   // In merge view: sort rows by active dims then compute rowspans
   const displayRows = mergeView
@@ -170,10 +166,6 @@ export function DataTable({ activeDims, hasData, activeFilter, mergeView }: Prop
   const spanInfo = mergeView
     ? computeMergeSpans(displayRows, DIM_COLS.map(c => c.rowKey))
     : null;
-
-  const bdB = '1px solid #dee0e3';
-  const bdR = '1px solid #dee0e3';
-  const bdDR = '1px solid #c9cdd4';
 
   // Empty: no dims selected or no data
   if (!hasData || activeDims.length === 0) {
@@ -198,30 +190,8 @@ export function DataTable({ activeDims, hasData, activeFilter, mergeView }: Prop
     );
   }
 
-  const totalDimW   = DIM_COLS.reduce((s, c) => s + c.width, 0);
+  const totalDimW    = DIM_COLS.reduce((s, c) => s + c.width, 0);
   const totalMetricW = METRIC_COLS.reduce((s, c) => s + c.width, 0);
-
-  const dimThStyle = (i: number): React.CSSProperties => ({
-    position: 'sticky', top: 0, left: DIM_LEFT[i], zIndex: 30,
-    background: '#f5f6f7',
-    borderBottom: '1px solid #c9cdd4',
-    borderRight: i === LAST_DIM ? '2px solid #c9cdd4' : bdDR,
-    boxShadow: i === LAST_DIM ? '3px 0 6px -2px rgba(31,35,41,0.08)' : 'none',
-    padding: '8px 10px', fontSize: 13, color: '#1f2329', fontWeight: 500,
-    textAlign: 'center', whiteSpace: 'nowrap',
-    minWidth: DIM_COLS[i].width, width: DIM_COLS[i].width,
-  });
-
-  const dimTdStyle = (i: number, bg: string): React.CSSProperties => ({
-    position: 'sticky', left: DIM_LEFT[i], zIndex: 10,
-    background: bg,
-    borderBottom: bdB,
-    borderRight: i === LAST_DIM ? '2px solid #c9cdd4' : bdR,
-    boxShadow: i === LAST_DIM ? '3px 0 6px -2px rgba(31,35,41,0.06)' : 'none',
-    padding: '7px 10px', fontSize: 13, color: '#1f2329',
-    textAlign: 'center', whiteSpace: 'nowrap',
-    minWidth: DIM_COLS[i].width, width: DIM_COLS[i].width,
-  });
 
   // Summary row helpers
   const mean = (key: keyof Row) =>
@@ -229,177 +199,116 @@ export function DataTable({ activeDims, hasData, activeFilter, mergeView }: Prop
   const sum  = (key: keyof Row) =>
     rows.reduce((s, r) => s + (r[key] as number), 0);
 
+  // Build antd columns
+  const dimColumns: ColumnsType<Row> = DIM_COLS.map((col, i) => ({
+    title: col.label,
+    dataIndex: col.rowKey,
+    key: col.dimKey,
+    fixed: 'left' as const,
+    width: col.width,
+    align: 'center' as const,
+    sorter: (a: Row, b: Row) =>
+      String(a[col.rowKey]).localeCompare(String(b[col.rowKey]), 'zh-CN'),
+    ...(mergeView && spanInfo
+      ? {
+          onCell: (_record: Row, rowIndex?: number) => {
+            if (rowIndex === undefined) return {};
+            const si = spanInfo[rowIndex][i];
+            return { rowSpan: si.render ? si.rowspan : 0 };
+          },
+        }
+      : {}),
+    render: (val: unknown) => String(val),
+  }));
+
+  const metricColumns: ColumnsType<Row> = METRIC_COLS.map(col => ({
+    title: (
+      <Tooltip title={col.tooltip} placement="top">
+        <span style={{ cursor: 'pointer' }}>{col.label}</span>
+      </Tooltip>
+    ),
+    dataIndex: col.key,
+    key: String(col.key),
+    width: col.width,
+    align: 'right' as const,
+    sorter: (a: Row, b: Row) =>
+      (a[col.key] as number) - (b[col.key] as number),
+    render: (val: number) => fmt(val, col.decimals ?? 0),
+  }));
+
+  const columns: ColumnsType<Row> = [...dimColumns, ...metricColumns];
+
   return (
-    <div style={{ flex: 1, overflow: 'hidden', fontFamily: F, display: 'flex', flexDirection: 'column' }}>
-      <div style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
-        <table style={{
-          borderCollapse: 'separate', borderSpacing: 0,
-          tableLayout: 'fixed',
-          minWidth: totalDimW + totalMetricW,
-        }}>
-          <colgroup>
-            {DIM_COLS.map(c   => <col key={c.dimKey}     style={{ width: c.width,   minWidth: c.width   }} />)}
-            {METRIC_COLS.map(c => <col key={String(c.key)} style={{ width: c.width, minWidth: c.width }} />)}
-          </colgroup>
-
-          <thead>
-            <tr>
-              {DIM_COLS.map((col, i) => (
-                <th key={col.dimKey} style={dimThStyle(i)}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-                    {col.label}
-                    <ArrowUpDown size={11} color="#aaa" style={{ cursor: 'pointer', flexShrink: 0 }} />
-                  </div>
-                </th>
-              ))}
-              {METRIC_COLS.map(col => (
-                <th
-                  key={String(col.key)}
-                  style={{
-                    position: 'sticky', top: 0, zIndex: 20,
-                    background: '#f5f6f7',
-                    borderBottom: '1px solid #c9cdd4', borderRight: bdR,
-                    padding: '8px 10px', fontSize: 12, color: '#1f2329', fontWeight: 500,
-                    textAlign: 'right', whiteSpace: 'nowrap', cursor: 'pointer',
-                    minWidth: col.width, width: col.width,
-                  }}
-                  onMouseEnter={e => {
-                    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                    setTooltip({ text: col.tooltip, x: r.left + r.width / 2, y: r.bottom + 4 });
-                  }}
-                  onMouseLeave={() => setTooltip(null)}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3 }}>
-                    {col.label} <ArrowUpDown size={11} color="#aaa" style={{ flexShrink: 0 }} />
-                  </div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-
-          <tbody>
-            {displayRows.map((row, rowIdx) => {
-              const bg = hoveredRow === row.id ? '#f0f4ff' : '#fff';
-              return (
-                <tr
-                  key={row.id}
-                  onMouseEnter={() => setHoveredRow(row.id)}
-                  onMouseLeave={() => setHoveredRow(null)}
-                >
-                  {DIM_COLS.map((col, i) => {
-                    if (spanInfo) {
-                      const si = spanInfo[rowIdx][i];
-                      if (!si.render) return null;
-                      return (
-                        <td
-                          key={col.dimKey}
-                          rowSpan={si.rowspan}
-                          style={{
-                            ...dimTdStyle(i, '#fff'),
-                            verticalAlign: 'middle',
-                            background: si.rowspan > 1 ? '#fafafa' : '#fff',
-                          }}
-                        >
-                          {String(row[col.rowKey])}
-                        </td>
-                      );
-                    }
-                    return (
-                      <td key={col.dimKey} style={dimTdStyle(i, bg)}>
-                        {String(row[col.rowKey])}
-                      </td>
-                    );
-                  })}
-                  {METRIC_COLS.map(col => (
-                    <td key={String(col.key)} style={{
-                      borderBottom: bdB, borderRight: bdR,
-                      padding: '7px 10px', fontSize: 12, color: '#1f2329',
-                      textAlign: 'right', whiteSpace: 'nowrap',
-                      background: bg,
-                    }}>
-                      {fmt(row[col.key] as number, col.decimals ?? 0)}
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
-
+    <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <Table<Row>
+        dataSource={displayRows}
+        rowKey="id"
+        columns={columns}
+        pagination={false}
+        size="small"
+        scroll={{ x: totalDimW + totalMetricW, y: 'calc(100vh - 280px)' }}
+        sticky
+        onRow={(record) => ({
+          onMouseEnter: () => setHoveredRow(record.id),
+          onMouseLeave: () => setHoveredRow(null),
+        })}
+        rowClassName={(record) => (hoveredRow === record.id ? 'ant-table-row-hover' : '')}
+        summary={() => (
+          <Table.Summary fixed>
             {/* Average row */}
-            <SummaryRow
-              label="平均值"
-              DIM_COLS={DIM_COLS} DIM_LEFT={DIM_LEFT} LAST_DIM={LAST_DIM}
-              bg="#f5f6f7" fontWeight={400} color="#646a73"
-              getValue={col => mean(col.key)}
-              decimals={col => col.decimals ?? 0}
-            />
+            <Table.Summary.Row style={{ background: '#fafafa' }}>
+              {DIM_COLS.map((col, i) => (
+                <Table.Summary.Cell
+                  key={col.dimKey}
+                  index={i}
+                  align="center"
+                >
+                  <span style={{ fontSize: 12, fontWeight: 400, color: '#595959' }}>
+                    {i === 0 ? '平均值' : ''}
+                  </span>
+                </Table.Summary.Cell>
+              ))}
+              {METRIC_COLS.map((col, i) => (
+                <Table.Summary.Cell
+                  key={String(col.key)}
+                  index={DIM_COLS.length + i}
+                  align="right"
+                >
+                  <span style={{ fontSize: 12, fontWeight: 400, color: '#595959' }}>
+                    {fmt(mean(col.key), col.decimals ?? 0)}
+                  </span>
+                </Table.Summary.Cell>
+              ))}
+            </Table.Summary.Row>
 
             {/* Total row */}
-            <SummaryRow
-              label="总计"
-              DIM_COLS={DIM_COLS} DIM_LEFT={DIM_LEFT} LAST_DIM={LAST_DIM}
-              bg="#eef2ff" fontWeight={600} color="#3370ff"
-              getValue={col => AVG_KEYS.has(col.key) ? mean(col.key) : sum(col.key)}
-              decimals={col => col.decimals ?? 0}
-            />
-          </tbody>
-        </table>
-      </div>
-
-      {tooltip && (
-        <div style={{
-          position: 'fixed', left: tooltip.x, top: tooltip.y,
-          transform: 'translateX(-50%)',
-          background: 'rgba(0,0,0,0.75)', color: '#fff',
-          fontSize: 11, padding: '4px 8px', borderRadius: 4,
-          zIndex: 9999, whiteSpace: 'nowrap', pointerEvents: 'none',
-        }}>
-          {tooltip.text}
-        </div>
-      )}
+            <Table.Summary.Row style={{ background: '#eef2ff' }}>
+              {DIM_COLS.map((col, i) => (
+                <Table.Summary.Cell
+                  key={col.dimKey}
+                  index={i}
+                  align="center"
+                >
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#1677ff' }}>
+                    {i === 0 ? '总计' : ''}
+                  </span>
+                </Table.Summary.Cell>
+              ))}
+              {METRIC_COLS.map((col, i) => (
+                <Table.Summary.Cell
+                  key={String(col.key)}
+                  index={DIM_COLS.length + i}
+                  align="right"
+                >
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#1677ff' }}>
+                    {fmt(AVG_KEYS.has(col.key) ? mean(col.key) : sum(col.key), col.decimals ?? 0)}
+                  </span>
+                </Table.Summary.Cell>
+              ))}
+            </Table.Summary.Row>
+          </Table.Summary>
+        )}
+      />
     </div>
-  );
-}
-
-// ── Summary row ──────────────────────────────────────────────
-type DimCol = { dimKey: string; rowKey: keyof Row; label: string; width: number };
-
-function SummaryRow({ label, DIM_COLS, DIM_LEFT, LAST_DIM, bg, fontWeight, color, getValue, decimals }: {
-  label: string;
-  DIM_COLS: DimCol[];
-  DIM_LEFT: number[];
-  LAST_DIM: number;
-  bg: string;
-  fontWeight: number;
-  color: string;
-  getValue: (col: MetricCol) => number;
-  decimals: (col: MetricCol) => number;
-}) {
-  return (
-    <tr>
-      {DIM_COLS.map((col, i) => (
-        <td key={col.dimKey} style={{
-          position: 'sticky', left: DIM_LEFT[i], zIndex: 10,
-          background: bg,
-          borderBottom: '1px solid #e8e8e8',
-          borderRight: i === LAST_DIM ? '2px solid #badcff' : '1px solid #e8e8e8',
-          boxShadow: i === LAST_DIM ? '3px 0 6px -2px rgba(0,0,0,0.08)' : 'none',
-          padding: '7px 10px', fontSize: 12, fontWeight, color,
-          textAlign: 'center', whiteSpace: 'nowrap',
-          minWidth: col.width, width: col.width,
-        }}>
-          {i === 0 ? label : ''}
-        </td>
-      ))}
-      {METRIC_COLS.map(col => (
-        <td key={String(col.key)} style={{
-          borderBottom: '1px solid #e8e8e8', borderRight: '1px solid #e8e8e8',
-          background: bg,
-          padding: '7px 10px', fontSize: 12, fontWeight, color,
-          textAlign: 'right', whiteSpace: 'nowrap',
-        }}>
-          {fmt(getValue(col), decimals(col))}
-        </td>
-      ))}
-    </tr>
   );
 }

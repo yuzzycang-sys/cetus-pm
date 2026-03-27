@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Settings2 } from 'lucide-react';
+import { Button, Tag } from 'antd';
 
-const F = "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif";
+const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
 
 /* ── Color system ─────────────────────────────────────────── */
 export type TagColor = string; // now supports any hex
@@ -112,13 +113,19 @@ export function QuickTagBar({ tags, onToggleTag, onManage, onReorderTags }: Prop
       borderBottom: 'none', padding: '0 16px',
       background: 'transparent', gap: 8, flexShrink: 0, fontFamily: F,
     }}>
-      <div onClick={onManage} style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#aaa', flexShrink: 0, cursor: 'pointer' }}
-        onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.color = '#1890ff'; }}
-        onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.color = '#aaa'; }}
+      <Button
+        type="link"
+        size="small"
+        icon={<Settings2 size={12} />}
+        onClick={onManage}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          fontSize: 12, padding: 0, height: 'auto', flexShrink: 0,
+          color: '#1890ff',
+        }}
       >
-        <Settings2 size={12} />
-        <span style={{ fontSize: 12, color: '#1890ff' }}>快捷标签</span>
-      </div>
+        快捷标签
+      </Button>
 
       {tags.map(tag => {
         const s = getColorStyles(tag.color);
@@ -131,7 +138,7 @@ export function QuickTagBar({ tags, onToggleTag, onManage, onReorderTags }: Prop
         );
       })}
 
-      
+
     </div>
   );
 }
@@ -141,17 +148,16 @@ function TagItem({ tag, styles, onToggle }: {
   styles: { border: string; bg: string; text: string; cbBg: string };
   onToggle: () => void;
 }) {
-  const [hovered, setHovered] = useState(false);
   return (
-    <div
+    <Tag
       onClick={onToggle}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       style={{
-        display: 'flex', alignItems: 'center', gap: 5,
+        display: 'inline-flex', alignItems: 'center', gap: 5,
         padding: '2px 10px', borderRadius: 4, cursor: 'pointer',
+        fontSize: 12, userSelect: 'none', margin: 0,
         border: `1px solid ${tag.active ? styles.border : '#d9d9d9'}`,
-        background: tag.active ? styles.bg : hovered ? '#f8f8f8' : '#fafafa',
+        background: tag.active ? styles.bg : '#fafafa',
+        color: tag.active ? styles.text : '#666',
       }}
     >
       <div style={{
@@ -167,7 +173,7 @@ function TagItem({ tag, styles, onToggle }: {
           </svg>
         )}
       </div>
-      <span style={{ fontSize: 12, color: tag.active ? styles.text : '#666' }}>{tag.label}</span>
-    </div>
+      <span>{tag.label}</span>
+    </Tag>
   );
 }

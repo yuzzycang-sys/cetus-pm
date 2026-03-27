@@ -1,11 +1,8 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { ChevronDown, Check, Search, X, ArrowLeft } from 'lucide-react';
-
-const F = "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif";
+import { Button, Checkbox, Input, Segmented, Tag } from 'antd';
+import { SearchOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 
 type MatchMode = 'exact' | 'fuzzy';
-
-// 自定义值的元信息：通过精确批量追加的 unmatched 值，或模糊批量追加的所有值
 type CustomKind = 'exact' | 'fuzzy';
 
 interface Props {
@@ -25,70 +22,15 @@ function parseTokens(raw: string): string[] {
     .filter(Boolean);
 }
 
-// ── Small segmented toggle ────────────────────────────────────
-function ModeToggle({ value, onChange }: { value: MatchMode; onChange: (v: MatchMode) => void }) {
-  return (
-    <div style={{
-      display: 'inline-flex',
-      border: '1px solid #d9d9d9',
-      borderRadius: 5,
-      overflow: 'hidden',
-      fontSize: 12,
-      flexShrink: 0,
-    }}>
-      {(['exact', 'fuzzy'] as const).map(m => {
-        const active = value === m;
-        const label  = m === 'exact' ? '精确' : '模糊';
-        return (
-          <div
-            key={m}
-            onClick={() => onChange(m)}
-            style={{
-              padding: '3px 9px',
-              cursor: 'pointer',
-              background: active ? '#1890ff' : '#fff',
-              color: active ? '#fff' : '#555',
-              userSelect: 'none',
-              transition: 'background 0.12s, color 0.12s',
-              borderRight: m === 'exact' ? '1px solid #d9d9d9' : 'none',
-            }}
-          >
-            {label}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ── Custom value badge ────────────────────────────────────────
 function CustomBadge({ kind }: { kind: CustomKind | undefined }) {
+  if (!kind) return null;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0, marginLeft: 2 }}>
-      {/* Mode tag */}
-      {kind === 'exact' && (
-        <span style={{
-          fontSize: 10, lineHeight: '16px',
-          padding: '0 5px', borderRadius: 3,
-          background: '#f6ffed', color: '#52c41a',
-          border: '1px solid #b7eb8f',
-          whiteSpace: 'nowrap',
-        }}>
-          精确
-        </span>
-      )}
-      {kind === 'fuzzy' && (
-        <span style={{
-          fontSize: 10, lineHeight: '16px',
-          padding: '0 5px', borderRadius: 3,
-          background: '#f9f0ff', color: '#722ed1',
-          border: '1px solid #d3adf7',
-          whiteSpace: 'nowrap',
-        }}>
-          模糊
-        </span>
-      )}
-    </div>
+    <Tag
+      style={{ marginInlineEnd: 0, marginLeft: 2, flexShrink: 0, fontSize: 10, lineHeight: '16px', padding: '0 5px' }}
+      color={kind === 'exact' ? 'success' : 'purple'}
+    >
+      {kind === 'exact' ? '精确' : '模糊'}
+    </Tag>
   );
 }
 
@@ -103,7 +45,6 @@ export function MultiSelectChip({
   const [matchMode, setMatchMode] = useState<MatchMode>('exact');
   const [dropPos, setDropPos]     = useState<{ left: number; top: number } | null>(null);
 
-  // 自定义值元信息：key = 值文本，value = 追加方式
   const [customMeta, setCustomMeta] = useState<Record<string, CustomKind>>({});
 
   const wrapRef       = useRef<HTMLDivElement>(null);
@@ -135,12 +76,10 @@ export function MultiSelectChip({
     ignoreLeave.current = true;
     window.setTimeout(() => {
       ignoreLeave.current = false;
-      // 若鼠标在忽略期间已离开组件，补发关闭调度
       if (!mouseInside.current) scheduleClose();
     }, 220);
   };
 
-  // 只依赖鼠标进出关闭：选中后不立即消失，鼠标移出后才消失
   useEffect(() => {
     if (!open) return;
     return () => {
@@ -148,14 +87,12 @@ export function MultiSelectChip({
     };
   }, [open]);
 
-  // ── Auto-focus ────────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
     if (mode === 'list')  setTimeout(() => searchRef.current?.focus(), 50);
     if (mode === 'batch') setTimeout(() => textareaRef.current?.focus(), 50);
   }, [open, mode]);
 
-  // Prevent dropdown clicks from reaching document outside-click handlers
   useEffect(() => {
     if (!open) return;
     const dropdownEl = dropdownRef.current;
@@ -189,18 +126,13 @@ export function MultiSelectChip({
     setOpen(v => !v);
   };
 
-  // ── Derived ───────────────────────────────────────────────────
   const optionSet = useMemo(() => new Set(options), [options]);
-
-  // 判断一个选中值是否为自定义（不在预定义 options 中）
   const isCustomValue = (v: string) => !optionSet.has(v);
 
-  // ── List mode helpers ─────────────────────────────────────────
   const filteredOptions = options.filter(o =>
     o.toLowerCase().includes(search.toLowerCase())
   );
 
-  // 已选 tab：predefined options + custom values 都要展示
   const displayList =
     tab === 'all'
       ? filteredOptions
@@ -211,7 +143,6 @@ export function MultiSelectChip({
     clearCloseTimer();
 
     if (selected.includes(opt)) {
-      // 取消勾选时同步清理 customMeta
       onChange(selected.filter(s => s !== opt));
       if (customMeta[opt] !== undefined) {
         setCustomMeta(prev => {
@@ -223,7 +154,6 @@ export function MultiSelectChip({
     } else {
       onChange([...selected, opt]);
     }
-    // 保持下拉展开，避免选中项导致误关闭
     setOpen(true);
   };
 
@@ -237,7 +167,6 @@ export function MultiSelectChip({
 
     if (isAllSelected) {
       const fs = new Set(filteredOptions);
-      // 全部取消时，清理这些 options 对应的 customMeta（预定义 options 不会有，但保险起见）
       onChange(selected.filter(s => !fs.has(s)));
       setCustomMeta(prev => {
         const next = { ...prev };
@@ -267,7 +196,6 @@ export function MultiSelectChip({
     setOpen(true);
   };
 
-  // ── Batch mode helpers ────────────────────────────────────────
   const batchTokens    = useMemo(() => parseTokens(batchText), [batchText]);
   const exactMatched   = useMemo(() => batchTokens.filter(t => optionSet.has(t)),  [batchTokens, optionSet]);
   const exactUnmatched = useMemo(() => batchTokens.filter(t => !optionSet.has(t)), [batchTokens, optionSet]);
@@ -278,13 +206,10 @@ export function MultiSelectChip({
     clearCloseTimer();
 
     if (matchMode === 'exact') {
-      // 精确模式：只追加命中预定义选项的值，未命中的直接忽略
       if (exactMatched.length === 0) return;
       const merged = Array.from(new Set([...selected, ...exactMatched]));
       onChange(merged);
-      // 精确模式不产生自定义值，无需写 customMeta
     } else {
-      // 模糊模式：全部 tokens 均作为模糊自定义值追加
       const merged = Array.from(new Set([...selected, ...batchTokens]));
       onChange(merged);
       const newMeta: Record<string, CustomKind> = {};
@@ -298,7 +223,6 @@ export function MultiSelectChip({
     setOpen(true);
   };
 
-  // ── Trigger chip label ────────────────────────────────────────
   const hasSelection = selected.length > 0;
 
   let displayValue: string;
@@ -322,20 +246,19 @@ export function MultiSelectChip({
   const selectAllDisabled = exclude;
   const excludeDisabled   = isAllSelected && !search && !exclude;
 
-  // 统计自定义值数量（用于 tab 提示）
   const customCount = selected.filter(s => isCustomValue(s)).length;
   const hasAnnotations = useMemo(
     () => options.some(o => !!optionAnnotations?.[o]?.col1 || !!optionAnnotations?.[o]?.col2),
     [options, optionAnnotations],
   );
 
-  // ── Render ────────────────────────────────────────────────────
   return (
-    <div ref={wrapRef} style={{ position: 'relative', flexShrink: 0 }}
+    <div
+      ref={wrapRef}
+      style={{ position: 'relative', flexShrink: 0 }}
       onMouseEnter={() => { mouseInside.current = true; clearCloseTimer(); }}
       onMouseLeave={() => { mouseInside.current = false; scheduleClose(); }}
     >
-
       {/* ── Trigger button ── */}
       <button
         ref={btnRef}
@@ -343,7 +266,7 @@ export function MultiSelectChip({
         onClick={handleToggle}
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 4,
-          border: `1px solid ${(open || isActive) ? activeColor : '#dee0e3'}`,
+          border: `1px solid ${(open || isActive) ? activeColor : '#d9d9d9'}`,
           borderRadius: 4, padding: '0 8px', height: 28,
           background: isActive ? activeBg : open ? '#f5f5f5' : '#fff',
           cursor: 'pointer', fontSize: 13,
@@ -358,69 +281,65 @@ export function MultiSelectChip({
         }}>
           {displayValue}
         </span>
-        <ChevronDown
-          size={11}
-          color={isActive ? activeColor : '#aaa'}
-          style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}
-        />
+        <svg
+          width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={isActive ? activeColor : '#aaa'}
+          strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: 'transform 0.15s', transform: open ? 'rotate(180deg)' : 'none' }}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
       </button>
 
       {/* ── Dropdown ── */}
       {open && dropPos && (
-        <div ref={dropdownRef}
+        <div
+          ref={dropdownRef}
           onMouseEnter={() => { mouseInside.current = true; clearCloseTimer(); }}
           onMouseLeave={() => { mouseInside.current = false; scheduleClose(); }}
           style={{
-          position: 'fixed',
-          left: dropPos.left,
-          top: dropPos.top,
-          zIndex: 9999,
-          background: '#fff',
-          borderRadius: 8,
-          border: '1px solid #e8e8e8',
-          boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
-          width: 300,
-          fontFamily: F,
-          overflow: 'hidden',
-        }}>
+            position: 'fixed',
+            left: dropPos.left,
+            top: dropPos.top,
+            zIndex: 9999,
+            background: '#fff',
+            borderRadius: 8,
+            border: '1px solid #e8e8e8',
+            boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
+            width: 300,
+            overflow: 'hidden',
+          }}
+        >
 
           {/* ════════════════ LIST MODE ════════════════ */}
           {mode === 'list' && (<>
 
-            {/* Search bar + 批量输入 link */}
+            {/* Search bar */}
             <div style={{ padding: '10px 12px 0' }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                border: '1px solid #e0e0e0', borderRadius: 5,
-                padding: '5px 9px', background: '#fafafa',
-              }}>
-                <Search size={12} color="#bbb" style={{ flexShrink: 0 }} />
-                <input
-                  ref={searchRef}
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder="搜索选项…"
-                  style={{
-                    border: 'none', outline: 'none', fontSize: 12,
-                    flex: 1, color: '#333', background: 'transparent', minWidth: 0,
-                  }}
-                />
-                {search
-                  ? <X size={12} color="#bbb" style={{ cursor: 'pointer', flexShrink: 0 }} onClick={() => setSearch('')} />
-                  : (
+              <Input
+                ref={searchRef as React.Ref<any>}
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="搜索选项…"
+                size="middle"
+                prefix={<SearchOutlined style={{ color: '#bbb', fontSize: 12 }} />}
+                suffix={
+                  search ? (
                     <span
+                      style={{ cursor: 'pointer', color: '#bbb', fontSize: 12 }}
+                      onClick={() => setSearch('')}
+                    >✕</span>
+                  ) : (
+                    <Button
+                      type="link"
+                      size="small"
+                      style={{ fontSize: 11, padding: 0, height: 'auto', borderLeft: '1px solid #e8e8e8', paddingLeft: 7, marginLeft: 2 }}
                       onClick={() => setMode('batch')}
-                      style={{
-                        fontSize: 11, color: '#1890ff', cursor: 'pointer',
-                        whiteSpace: 'nowrap', flexShrink: 0,
-                        borderLeft: '1px solid #e8e8e8', paddingLeft: 7, marginLeft: 2,
-                      }}
                     >
                       批量输入
-                    </span>
+                    </Button>
                   )
                 }
-              </div>
+                style={{ background: '#fafafa', fontSize: 12 }}
+              />
             </div>
 
             {/* Tabs */}
@@ -431,7 +350,6 @@ export function MultiSelectChip({
               marginTop: 8,
             }}>
               {(['all', 'selected'] as const).map(t => {
-                // 已选 tab：展示选中总数，括号内额外说明自定义数量
                 let tabLabel: React.ReactNode;
                 if (t === 'all') {
                   tabLabel = '全部';
@@ -440,13 +358,9 @@ export function MultiSelectChip({
                     <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <span>已选 ({selected.length})</span>
                       {customCount > 0 && (
-                        <span style={{
-                          fontSize: 10, padding: '0 4px', borderRadius: 3,
-                          background: '#f5f5f5', color: '#999', border: '1px solid #e8e8e8',
-                          lineHeight: '16px',
-                        }}>
+                        <Tag style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', margin: 0 }}>
                           {customCount} 自定义
-                        </span>
+                        </Tag>
                       )}
                     </span>
                   );
@@ -480,7 +394,7 @@ export function MultiSelectChip({
                 displayList.map(opt => {
                   const checked  = selected.includes(opt);
                   const isCustom = isCustomValue(opt);
-                  const kind     = customMeta[opt]; // 'exact' | 'fuzzy' | undefined
+                  const kind     = customMeta[opt];
 
                   return (
                     <div
@@ -493,29 +407,17 @@ export function MultiSelectChip({
                       onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = '#f5f5f5'}
                       onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
                     >
-                      {/* Checkbox */}
-                      <div style={{
-                        width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-                        border: `1.5px solid ${checked ? '#1890ff' : '#d9d9d9'}`,
-                        background: checked ? '#1890ff' : '#fff',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'all 0.12s',
-                      }}>
-                        {checked && <Check size={10} color="#fff" strokeWidth={3} />}
-                      </div>
+                      <Checkbox checked={checked} style={{ flexShrink: 0 }} />
 
-                      {/* Label */}
                       <span style={{
                         flex: hasAnnotations ? '0 0 44%' : 1,
                         minWidth: 0,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        fontStyle: 'normal',
                         color: isCustom ? '#555' : '#333',
                       }}>
                         {opt}
                       </span>
 
-                      {/* Optional annotation columns */}
                       {hasAnnotations && (
                         <>
                           <span style={{
@@ -524,7 +426,7 @@ export function MultiSelectChip({
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
-                            color: '#646a73',
+                            color: '#595959',
                             fontSize: 12,
                             textAlign: 'left',
                           }}>
@@ -536,7 +438,7 @@ export function MultiSelectChip({
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap',
-                            color: '#8f959e',
+                            color: '#8c8c8c',
                             fontSize: 12,
                             textAlign: 'left',
                           }}>
@@ -545,10 +447,7 @@ export function MultiSelectChip({
                         </>
                       )}
 
-                      {/* 自定义 + 匹配方式 badges（仅在"已选"tab 中展示，或值本身就是自定义时） */}
-                      {isCustom && (
-                        <CustomBadge kind={kind} />
-                      )}
+                      {isCustom && <CustomBadge kind={kind} />}
                     </div>
                   );
                 })
@@ -572,15 +471,11 @@ export function MultiSelectChip({
                   userSelect: 'none',
                 }}
               >
-                <div style={{
-                  width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-                  border: `1.5px solid ${isAllSelected && !selectAllDisabled ? '#1890ff' : '#d9d9d9'}`,
-                  background: isAllSelected && !selectAllDisabled ? '#1890ff' : '#fff',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'all 0.12s',
-                }}>
-                  {isAllSelected && !selectAllDisabled && <Check size={10} color="#fff" strokeWidth={3} />}
-                </div>
+                <Checkbox
+                  checked={isAllSelected && !selectAllDisabled}
+                  disabled={selectAllDisabled}
+                  style={{ pointerEvents: 'none' }}
+                />
                 <span style={{ fontSize: 12, color: '#444' }}>全选</span>
               </div>
 
@@ -594,15 +489,11 @@ export function MultiSelectChip({
                   userSelect: 'none',
                 }}
               >
-                <div style={{
-                  width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-                  border: `1.5px solid ${exclude ? '#fa8c16' : '#d9d9d9'}`,
-                  background: exclude ? '#fa8c16' : '#fff',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'all 0.12s',
-                }}>
-                  {exclude && <Check size={10} color="#fff" strokeWidth={3} />}
-                </div>
+                <Checkbox
+                  checked={exclude}
+                  disabled={excludeDisabled}
+                  style={{ pointerEvents: 'none' }}
+                />
                 <span style={{ fontSize: 12, color: exclude ? '#fa8c16' : '#444' }}>排除</span>
               </div>
             </div>
@@ -627,27 +518,40 @@ export function MultiSelectChip({
           {/* ════════════════ BATCH MODE ════════════════ */}
           {mode === 'batch' && (<>
 
-            {/* Header: 返回 + 精确/模糊 toggle */}
+            {/* Header */}
             <div style={{
               display: 'flex', alignItems: 'center',
               padding: '9px 12px 8px',
               borderBottom: '1px solid #f0f0f0',
               gap: 8,
             }}>
-              <div
+              <Button
+                type="link"
+                size="small"
+                icon={<ArrowLeftOutlined />}
                 onClick={() => setMode('list')}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 3,
-                  cursor: 'pointer', color: '#1890ff', fontSize: 12,
-                  userSelect: 'none', flexShrink: 0,
-                }}
+                style={{ padding: 0, height: 'auto', fontSize: 12, flexShrink: 0 }}
               >
-                <ArrowLeft size={13} color="#1890ff" />
-                <span>返回</span>
-              </div>
+                返回
+              </Button>
               <div style={{ flex: 1 }} />
               <span style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>匹配方式</span>
-              <ModeToggle value={matchMode} onChange={setMatchMode} />
+              <style>{`
+                .match-mode-seg .ant-segmented-item { font-weight: 400 !important; color: #8c8c8c; font-size: 11px !important; }
+                .match-mode-seg .ant-segmented-item-selected { font-weight: 400 !important; color: #595959 !important; font-size: 11px !important; }
+                .match-mode-seg .ant-segmented-item-label { font-size: 11px !important; }
+              `}</style>
+              <Segmented
+                size="small"
+                value={matchMode}
+                onChange={v => setMatchMode(v as MatchMode)}
+                options={[
+                  { label: '精确', value: 'exact' },
+                  { label: '模糊', value: 'fuzzy' },
+                ]}
+                className="match-mode-seg"
+                style={{ fontSize: 11 }}
+              />
             </div>
 
             {/* Hint bar */}
@@ -666,18 +570,16 @@ export function MultiSelectChip({
 
             {/* Textarea */}
             <div style={{ padding: '10px 12px 0' }}>
-              <textarea
-                ref={textareaRef}
+              <Input.TextArea
+                ref={textareaRef as React.Ref<any>}
                 value={batchText}
                 onChange={e => setBatchText(e.target.value)}
                 placeholder={'每行一个，或用逗号、空格分隔\n例：张磊, 李明\n王芳'}
-                rows={7}
                 style={{
-                  width: '100%', boxSizing: 'border-box',
-                  border: '1px solid #e0e0e0', borderRadius: 5,
-                  padding: '8px 10px', fontSize: 12, color: '#333',
-                  resize: 'none', outline: 'none', lineHeight: 1.7,
-                  fontFamily: F, background: '#fafafa',
+                  fontSize: 12, color: '#333',
+                  resize: 'none', lineHeight: 1.7,
+                  background: '#fafafa',
+                  minHeight: 120,
                 }}
               />
             </div>
@@ -698,14 +600,9 @@ export function MultiSelectChip({
                 )}
                 {exactUnmatched.length > 0 && (
                   <div style={{ fontSize: 11, color: '#bbb', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center',
-                      padding: '0 5px', borderRadius: 3,
-                      background: '#f5f5f5', color: '#999', border: '1px solid #e8e8e8',
-                      fontSize: 10, lineHeight: '16px', flexShrink: 0,
-                    }}>
+                    <Tag style={{ fontSize: 10, lineHeight: '16px', padding: '0 5px', flexShrink: 0 }}>
                       已忽略 {exactUnmatched.length} 项
-                    </span>
+                    </Tag>
                     <span style={{
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       maxWidth: 150,
@@ -727,12 +624,7 @@ export function MultiSelectChip({
               <div style={{ padding: '7px 13px 4px' }}>
                 <div style={{ fontSize: 11, color: '#7c4dff', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                   <span>共 {batchTokens.length} 个关键字将以</span>
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center',
-                    padding: '0 5px', borderRadius: 3,
-                    background: '#f9f0ff', color: '#722ed1', border: '1px solid #d3adf7',
-                    fontSize: 10, lineHeight: '16px',
-                  }}>模糊</span>
+                  <Tag color="purple" style={{ fontSize: 10, lineHeight: '16px', padding: '0 5px', margin: 0 }}>模糊</Tag>
                   <span>自定义值追加到已选</span>
                 </div>
               </div>
@@ -740,30 +632,14 @@ export function MultiSelectChip({
 
             {/* Confirm button */}
             <div style={{ padding: '10px 12px 12px' }}>
-              <button
-                onClick={handleBatchConfirm}
+              <Button
+                block
+                type="primary"
                 disabled={matchMode === 'exact' ? exactMatched.length === 0 : batchTokens.length === 0}
-                style={{
-                  width: '100%',
-                  padding: '7px 0',
-                  borderRadius: 5,
-                  border: 'none',
-                  background: (() => {
-                    if (matchMode === 'exact') return exactMatched.length > 0 ? '#1890ff' : '#f0f0f0';
-                    return batchTokens.length > 0 ? '#7c4dff' : '#f0f0f0';
-                  })(),
-                  color: (() => {
-                    if (matchMode === 'exact') return exactMatched.length > 0 ? '#fff' : '#bbb';
-                    return batchTokens.length > 0 ? '#fff' : '#bbb';
-                  })(),
-                  fontSize: 13,
-                  cursor: (() => {
-                    if (matchMode === 'exact') return exactMatched.length > 0 ? 'pointer' : 'not-allowed';
-                    return batchTokens.length > 0 ? 'pointer' : 'not-allowed';
-                  })(),
-                  transition: 'background 0.15s',
-                  fontFamily: F,
-                }}
+                onClick={handleBatchConfirm}
+                style={matchMode === 'fuzzy' && batchTokens.length > 0
+                  ? { background: '#7c4dff', borderColor: '#7c4dff' }
+                  : undefined}
               >
                 {matchMode === 'exact'
                   ? exactMatched.length > 0
@@ -772,7 +648,7 @@ export function MultiSelectChip({
                   : batchTokens.length > 0
                     ? `确认追加 ${batchTokens.length} 个关键字（模糊匹配）`
                     : '请输入内容'}
-              </button>
+              </Button>
             </div>
           </>)}
 

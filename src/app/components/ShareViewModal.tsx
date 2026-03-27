@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
-import ReactDOM from 'react-dom';
-import { X, Link2, Search, ChevronDown, ChevronRight, Check, Users, Globe, Lock } from 'lucide-react';
+import { Modal, Button, Input, Avatar as AntAvatar, Typography } from 'antd';
+import { Link2, Search, ChevronDown, ChevronRight, Check, Users, Globe, Lock } from 'lucide-react';
 import type { ViewItem } from './ViewSelectorDropdown';
-
-const F = "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif";
 
 export type ShareMode = 'private' | 'specific' | 'public';
 
@@ -50,17 +48,22 @@ const MOCK_DEPTS: MockDept[] = [
 
 /* ── Avatar ─────────────────────────────────────────────────── */
 const AVATAR_COLORS = ['#1890ff', '#52c41a', '#fa8c16', '#722ed1', '#eb2f96'];
-function Avatar({ name, idx }: { name: string; idx: number }) {
+function UserAvatar({ name, idx }: { name: string; idx: number }) {
   const color = AVATAR_COLORS[idx % AVATAR_COLORS.length];
   return (
-    <div style={{
-      width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-      background: color + '1a', border: `1.5px solid ${color}55`,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: 12, color, fontWeight: 500,
-    }}>
+    <AntAvatar
+      size={28}
+      style={{
+        flexShrink: 0,
+        backgroundColor: color + '1a',
+        border: `1.5px solid ${color}55`,
+        color,
+        fontSize: 12,
+        fontWeight: 500,
+      }}
+    >
       {name.slice(-1)}
-    </div>
+    </AntAvatar>
   );
 }
 
@@ -134,300 +137,260 @@ export function ShareViewModal({ view, onSave, onClose }: Props) {
     onClose();
   };
 
-  return ReactDOM.createPortal(
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 99999,
-      background: 'rgba(0,0,0,0.32)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontFamily: F,
-    }}>
-      <div style={{
-        width: 560, maxHeight: '86vh',
-        background: '#fff', borderRadius: 10,
-        boxShadow: '0 12px 40px rgba(0,0,0,0.18)',
-        display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      }}>
+  const footer = (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <Button
+        type="link"
+        icon={copied ? <Check size={13} /> : <Link2 size={13} />}
+        onClick={handleCopyLink}
+        style={{ color: copied ? '#52c41a' : '#1890ff', paddingLeft: 0 }}
+      >
+        {copied ? '链接已复制！' : '复制链接'}
+      </Button>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Button onClick={onClose}>取消</Button>
+        <Button type="primary" onClick={handleSave}>确认</Button>
+      </div>
+    </div>
+  );
 
-        {/* ── Header ── */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '16px 20px', borderBottom: '1px solid #f0f0f0', flexShrink: 0,
-        }}>
-          <div>
-            <span style={{ fontSize: 15, fontWeight: 500, color: '#222' }}>共享视图</span>
-            <span style={{ fontSize: 13, color: '#aaa', marginLeft: 8 }}>「{view.name}」</span>
-          </div>
-          <X size={16} color="#bbb" style={{ cursor: 'pointer' }} onClick={onClose} />
+  return (
+    <Modal
+      open={true}
+      onCancel={onClose}
+      title={
+        <span>
+          共享视图
+          <Typography.Text type="secondary" style={{ fontSize: 13, marginLeft: 8 }}>
+            「{view.name}」
+          </Typography.Text>
+        </span>
+      }
+      footer={footer}
+      width={560}
+      styles={{ body: { maxHeight: 'calc(86vh - 120px)', overflowY: 'auto' } }}
+    >
+      {/* Visibility */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 12, color: '#999', marginBottom: 10, letterSpacing: '0.02em' }}>可见范围</div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <VisCard active={shareMode === 'private'}  icon={<Lock  size={13} />} label="私有"    desc="仅自己可见"    onClick={() => setShareMode('private')}  />
+          <VisCard active={shareMode === 'specific'} icon={<Users size={13} />} label="指定用户" desc="手动添加授权成员" onClick={() => setShareMode('specific')} />
+          <VisCard active={shareMode === 'public'}   icon={<Globe size={13} />} label="公开"    desc="所有成员可查看"  onClick={() => setShareMode('public')}   />
         </div>
+      </div>
 
-        {/* ── Body ── */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 4px' }}>
+      {/* Public hint */}
+      {shareMode === 'public' && (
+        <div style={{
+          background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 6,
+          padding: '10px 14px', fontSize: 12, color: '#874d00', marginBottom: 16,
+        }}>
+          ⚠️ 公开模式下，组织内所有成员均可在「共享」标签中看到并使用此视图
+        </div>
+      )}
 
-          {/* Visibility */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 12, color: '#999', marginBottom: 10, letterSpacing: '0.02em' }}>可见范围</div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <VisCard active={shareMode === 'private'}  icon={<Lock  size={13} />} label="私有"    desc="仅自己可见"    onClick={() => setShareMode('private')}  />
-              <VisCard active={shareMode === 'specific'} icon={<Users size={13} />} label="指定用户" desc="手动添加授权成员" onClick={() => setShareMode('specific')} />
-              <VisCard active={shareMode === 'public'}   icon={<Globe size={13} />} label="公开"    desc="所有成员可查看"  onClick={() => setShareMode('public')}   />
-            </div>
+      {/* Specific-user section */}
+      {shareMode === 'specific' && (
+        <div>
+          {/* Search */}
+          <div style={{ fontSize: 12, color: '#999', marginBottom: 8, letterSpacing: '0.02em' }}>添加成员</div>
+          <div style={{ position: 'relative', marginBottom: 10 }}>
+            <Input
+              autoFocus
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              placeholder="搜索姓名或账号…"
+              prefix={<Search size={13} color="#bbb" />}
+              suffix={
+                searchText
+                  ? <span style={{ cursor: 'pointer', color: '#bbb', fontSize: 12 }} onClick={() => setSearchText('')}>✕</span>
+                  : null
+              }
+            />
+
+            {/* Search dropdown */}
+            {searchResults.length > 0 && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 200,
+                background: '#fff', border: '1px solid #e8e8e8', borderRadius: 6,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.1)', maxHeight: 200, overflowY: 'auto',
+              }}>
+                {searchResults.map((u, idx) => {
+                  const added = sharedWith.includes(u.id);
+                  return (
+                    <div
+                      key={u.id}
+                      onClick={() => !added && addUser(u.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '8px 12px', cursor: added ? 'default' : 'pointer',
+                        borderBottom: idx < searchResults.length - 1 ? '1px solid #f5f5f5' : 'none',
+                      }}
+                      onMouseEnter={e => { if (!added) (e.currentTarget as HTMLDivElement).style.background = '#f8f8f8'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <UserAvatar name={u.name} idx={idx} />
+                        <div>
+                          <span style={{ fontSize: 13, color: '#333' }}>{u.name}</span>
+                          <span style={{ fontSize: 11, color: '#aaa', marginLeft: 8 }}>{u.dept}</span>
+                        </div>
+                      </div>
+                      {added
+                        ? <span style={{ fontSize: 11, color: '#aaa' }}>已添加</span>
+                        : <span style={{ fontSize: 11, color: '#1890ff', cursor: 'pointer' }}>+ 添加</span>
+                      }
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {/* Public hint */}
-          {shareMode === 'public' && (
+          {/* Dept tree toggle */}
+          <div
+            onClick={() => setShowDeptTree(v => !v)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              fontSize: 12, color: '#1890ff', cursor: 'pointer',
+              marginBottom: 14, userSelect: 'none',
+            }}
+          >
+            {showDeptTree ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            按部门添加
+          </div>
+
+          {/* Dept tree */}
+          {showDeptTree && (
             <div style={{
-              background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 6,
-              padding: '10px 14px', fontSize: 12, color: '#874d00', marginBottom: 16,
+              border: '1px solid #e8e8e8', borderRadius: 6,
+              marginBottom: 16, overflow: 'hidden',
             }}>
-              ⚠️ 公开模式下，组织内所有成员均可在「共享」标签中看到并使用此视图
-            </div>
-          )}
+              {MOCK_DEPTS.map((dept, di) => {
+                const expanded = expandedDepts.includes(dept.id);
+                const allIds = dept.children.flatMap(c => c.userIds);
+                const allAdded = allIds.length > 0 && allIds.every(id => sharedWith.includes(id));
+                return (
+                  <div key={dept.id} style={{ borderBottom: di < MOCK_DEPTS.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                    {/* Top dept row */}
+                    <div
+                      onClick={() => toggleDept(dept.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '9px 12px', cursor: 'pointer', background: '#fafafa',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {expanded
+                          ? <ChevronDown size={12} color="#aaa" />
+                          : <ChevronRight size={12} color="#aaa" />
+                        }
+                        <span style={{ fontSize: 13, color: '#333', fontWeight: 500 }}>{dept.name}</span>
+                        <span style={{ fontSize: 11, color: '#bbb' }}>（{allIds.length} 人）</span>
+                      </div>
+                      <span
+                        onClick={e => { e.stopPropagation(); if (!allAdded) addUsers(allIds); }}
+                        style={{ fontSize: 12, color: allAdded ? '#bbb' : '#1890ff', cursor: allAdded ? 'default' : 'pointer' }}
+                      >
+                        {allAdded ? '已全部添加' : '全部添加'}
+                      </span>
+                    </div>
 
-          {/* Specific-user section */}
-          {shareMode === 'specific' && (
-            <div>
-              {/* Search */}
-              <div style={{ fontSize: 12, color: '#999', marginBottom: 8, letterSpacing: '0.02em' }}>添加成员</div>
-              <div style={{ position: 'relative', marginBottom: 10 }}>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  border: '1px solid #d9d9d9', borderRadius: 6, padding: '7px 10px',
-                }}>
-                  <Search size={13} color="#bbb" />
-                  <input
-                    autoFocus
-                    value={searchText}
-                    onChange={e => setSearchText(e.target.value)}
-                    placeholder="搜索姓名或账号…"
-                    style={{ flex: 1, border: 'none', outline: 'none', fontSize: 13, color: '#333', background: 'transparent' }}
-                  />
-                  {searchText && (
-                    <X size={12} color="#bbb" style={{ cursor: 'pointer', flexShrink: 0 }}
-                      onClick={() => setSearchText('')} />
-                  )}
-                </div>
-
-                {/* Search dropdown */}
-                {searchResults.length > 0 && (
-                  <div style={{
-                    position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 200,
-                    background: '#fff', border: '1px solid #e8e8e8', borderRadius: 6,
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.1)', maxHeight: 200, overflowY: 'auto',
-                  }}>
-                    {searchResults.map((u, idx) => {
-                      const added = sharedWith.includes(u.id);
+                    {/* Sub-depts */}
+                    {expanded && dept.children.map((sub) => {
+                      const subAllAdded = sub.userIds.every(id => sharedWith.includes(id));
                       return (
                         <div
-                          key={u.id}
-                          onClick={() => !added && addUser(u.id)}
+                          key={sub.id}
                           style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            padding: '8px 12px', cursor: added ? 'default' : 'pointer',
-                            borderBottom: idx < searchResults.length - 1 ? '1px solid #f5f5f5' : 'none',
+                            padding: '7px 12px 7px 32px',
+                            borderTop: '1px solid #f5f5f5',
+                            background: '#fff',
                           }}
-                          onMouseEnter={e => { if (!added) (e.currentTarget as HTMLDivElement).style.background = '#f8f8f8'; }}
-                          onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <Avatar name={u.name} idx={idx} />
-                            <div>
-                              <span style={{ fontSize: 13, color: '#333' }}>{u.name}</span>
-                              <span style={{ fontSize: 11, color: '#aaa', marginLeft: 8 }}>{u.dept}</span>
-                            </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 13, color: '#555' }}>{sub.name}</span>
+                            <span style={{ fontSize: 11, color: '#bbb' }}>（{sub.userIds.length} 人）</span>
                           </div>
-                          {added
-                            ? <span style={{ fontSize: 11, color: '#aaa' }}>已添加</span>
-                            : <span style={{ fontSize: 11, color: '#1890ff', cursor: 'pointer' }}>+ 添加</span>
-                          }
+                          <span
+                            onClick={() => { if (!subAllAdded) addUsers(sub.userIds); }}
+                            style={{ fontSize: 12, color: subAllAdded ? '#bbb' : '#1890ff', cursor: subAllAdded ? 'default' : 'pointer' }}
+                          >
+                            {subAllAdded ? '已全部添加' : '添加'}
+                          </span>
                         </div>
                       );
                     })}
                   </div>
-                )}
-              </div>
-
-              {/* Dept tree toggle */}
-              <div
-                onClick={() => setShowDeptTree(v => !v)}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontSize: 12, color: '#1890ff', cursor: 'pointer',
-                  marginBottom: 14, userSelect: 'none',
-                }}
-              >
-                {showDeptTree ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                按部门添加
-              </div>
-
-              {/* Dept tree */}
-              {showDeptTree && (
-                <div style={{
-                  border: '1px solid #e8e8e8', borderRadius: 6,
-                  marginBottom: 16, overflow: 'hidden',
-                }}>
-                  {MOCK_DEPTS.map((dept, di) => {
-                    const expanded = expandedDepts.includes(dept.id);
-                    const allIds = dept.children.flatMap(c => c.userIds);
-                    const allAdded = allIds.length > 0 && allIds.every(id => sharedWith.includes(id));
-                    return (
-                      <div key={dept.id} style={{ borderBottom: di < MOCK_DEPTS.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
-                        {/* Top dept row */}
-                        <div
-                          onClick={() => toggleDept(dept.id)}
-                          style={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            padding: '9px 12px', cursor: 'pointer', background: '#fafafa',
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            {expanded
-                              ? <ChevronDown size={12} color="#aaa" />
-                              : <ChevronRight size={12} color="#aaa" />
-                            }
-                            <span style={{ fontSize: 13, color: '#333', fontWeight: 500 }}>{dept.name}</span>
-                            <span style={{ fontSize: 11, color: '#bbb' }}>（{allIds.length} 人）</span>
-                          </div>
-                          <span
-                            onClick={e => { e.stopPropagation(); if (!allAdded) addUsers(allIds); }}
-                            style={{ fontSize: 12, color: allAdded ? '#bbb' : '#1890ff', cursor: allAdded ? 'default' : 'pointer' }}
-                          >
-                            {allAdded ? '已全部添加' : '全部添加'}
-                          </span>
-                        </div>
-
-                        {/* Sub-depts */}
-                        {expanded && dept.children.map((sub, si) => {
-                          const subAllAdded = sub.userIds.every(id => sharedWith.includes(id));
-                          return (
-                            <div
-                              key={sub.id}
-                              style={{
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                padding: '7px 12px 7px 32px',
-                                borderTop: '1px solid #f5f5f5',
-                                background: '#fff',
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{ fontSize: 13, color: '#555' }}>{sub.name}</span>
-                                <span style={{ fontSize: 11, color: '#bbb' }}>（{sub.userIds.length} 人）</span>
-                              </div>
-                              <span
-                                onClick={() => { if (!subAllAdded) addUsers(sub.userIds); }}
-                                style={{ fontSize: 12, color: subAllAdded ? '#bbb' : '#1890ff', cursor: subAllAdded ? 'default' : 'pointer' }}
-                              >
-                                {subAllAdded ? '已全部添加' : '添加'}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Authorized users list */}
-              <div style={{ marginBottom: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                  <span style={{ fontSize: 12, color: '#999' }}>已授权成员</span>
-                  {authorizedUsers.length > 0 && (
-                    <span style={{
-                      fontSize: 11, background: '#f5f5f5', color: '#aaa',
-                      borderRadius: 10, padding: '1px 7px',
-                    }}>
-                      {authorizedUsers.length} 人
-                    </span>
-                  )}
-                </div>
-
-                {authorizedUsers.length === 0 ? (
-                  <div style={{
-                    textAlign: 'center', padding: '22px 0',
-                    fontSize: 12, color: '#ccc',
-                    border: '1px dashed #e8e8e8', borderRadius: 6,
-                  }}>
-                    暂未添加任何成员，请通过搜索或部门选择添加
-                  </div>
-                ) : (
-                  <div style={{
-                    border: '1px solid #e8e8e8', borderRadius: 6,
-                    maxHeight: 200, overflowY: 'auto',
-                  }}>
-                    {authorizedUsers.map((u, i) => (
-                      <div
-                        key={u.id}
-                        style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          padding: '9px 12px',
-                          borderBottom: i < authorizedUsers.length - 1 ? '1px solid #f5f5f5' : 'none',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <Avatar name={u.name} idx={i} />
-                          <div>
-                            <div style={{ fontSize: 13, color: '#333' }}>{u.name}</div>
-                            <div style={{ fontSize: 11, color: '#aaa' }}>{u.dept}</div>
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          <span style={{ fontSize: 12, color: '#aaa' }}>可查看</span>
-                          <span
-                            onClick={() => removeUser(u.id)}
-                            style={{ fontSize: 12, color: '#ff4d4f', cursor: 'pointer' }}
-                          >
-                            撤销
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                );
+              })}
             </div>
           )}
-        </div>
 
-        {/* ── Footer ── */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 20px', borderTop: '1px solid #f0f0f0', flexShrink: 0,
-        }}>
-          <div
-            onClick={handleCopyLink}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              fontSize: 12, color: copied ? '#52c41a' : '#1890ff',
-              cursor: 'pointer', userSelect: 'none',
-            }}
-          >
-            {copied ? <Check size={13} /> : <Link2 size={13} />}
-            {copied ? '链接已复制！' : '复制链接'}
-          </div>
+          {/* Authorized users list */}
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: '#999' }}>已授权成员</span>
+              {authorizedUsers.length > 0 && (
+                <span style={{
+                  fontSize: 11, background: '#f5f5f5', color: '#aaa',
+                  borderRadius: 10, padding: '1px 7px',
+                }}>
+                  {authorizedUsers.length} 人
+                </span>
+              )}
+            </div>
 
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              onClick={onClose}
-              style={{
-                padding: '5px 18px', border: '1px solid #d9d9d9', borderRadius: 4,
-                background: '#fff', color: '#555', fontSize: 13, cursor: 'pointer', fontFamily: F,
-              }}
-            >
-              取消
-            </button>
-            <button
-              onClick={handleSave}
-              style={{
-                padding: '5px 18px', border: 'none', borderRadius: 4,
-                background: '#1890ff', color: '#fff', fontSize: 13, cursor: 'pointer', fontFamily: F,
-              }}
-            >
-              确认
-            </button>
+            {authorizedUsers.length === 0 ? (
+              <div style={{
+                textAlign: 'center', padding: '22px 0',
+                fontSize: 12, color: '#ccc',
+                border: '1px dashed #e8e8e8', borderRadius: 6,
+              }}>
+                暂未添加任何成员，请通过搜索或部门选择添加
+              </div>
+            ) : (
+              <div style={{
+                border: '1px solid #e8e8e8', borderRadius: 6,
+                maxHeight: 200, overflowY: 'auto',
+              }}>
+                {authorizedUsers.map((u, i) => (
+                  <div
+                    key={u.id}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '9px 12px',
+                      borderBottom: i < authorizedUsers.length - 1 ? '1px solid #f5f5f5' : 'none',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <UserAvatar name={u.name} idx={i} />
+                      <div>
+                        <div style={{ fontSize: 13, color: '#333' }}>{u.name}</div>
+                        <div style={{ fontSize: 11, color: '#aaa' }}>{u.dept}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ fontSize: 12, color: '#aaa' }}>可查看</span>
+                      <Button
+                        type="link"
+                        danger
+                        size="small"
+                        style={{ fontSize: 12, padding: 0, height: 'auto' }}
+                        onClick={() => removeUser(u.id)}
+                      >
+                        撤销
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-      </div>
-    </div>,
-    document.body
+      )}
+    </Modal>
   );
 }

@@ -1,7 +1,7 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { Check } from 'lucide-react';
+import React, { useRef, useEffect } from 'react';
+import { Checkbox, Divider, Menu } from 'antd';
 
-const F = "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif";
+const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
 
 interface Props {
   selectedView: string | null;
@@ -34,65 +34,51 @@ export function SaveMenu({ selectedView, cacheLastOp, onToggleCache, onUpdateVie
         border: '1px solid #e8e8e8',
       }}
     >
-      {/* Cache last operation */}
-      <MenuItem onClick={onToggleCache}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-          <div style={{
-            width: 14, height: 14, borderRadius: 2, border: '1px solid',
-            borderColor: cacheLastOp ? '#1890ff' : '#d9d9d9',
-            background: cacheLastOp ? '#1890ff' : '#fff',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-            {cacheLastOp && <Check size={10} color="#fff" strokeWidth={3} />}
-          </div>
-          <span style={{ color: '#333' }}>缓存最后操作</span>
-        </div>
-      </MenuItem>
-
-      <div style={{ height: 1, background: '#e8e8e8', margin: '0 0' }} />
-
-      {/* Update current view */}
-      <MenuItem
-        onClick={() => {
-          if (selectedView) { onUpdateView(); onClose(); }
-        }}
-        disabled={!selectedView}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 13, color: selectedView ? '#333' : '#bbb' }}>更新当前视图</span>
-          {!selectedView && (
-            <span style={{ fontSize: 11, color: '#bbb' }}>未选视图</span>
-          )}
-        </div>
-      </MenuItem>
-
-      {/* Save as new view */}
-      <MenuItem onClick={() => { onSaveAsNew(); onClose(); }}>
-        <span style={{ fontSize: 13, color: '#333' }}>另存为新视图</span>
-      </MenuItem>
-    </div>
-  );
-}
-
-function MenuItem({ children, onClick, disabled = false }: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-}) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <div
-      onClick={disabled ? undefined : onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        padding: '8px 12px',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        background: hovered && !disabled ? '#f8f8f8' : 'transparent',
-      }}
-    >
-      {children}
+      <Menu
+        selectable={false}
+        style={{ border: 'none', borderRadius: 6, fontSize: 13 }}
+        items={[
+          {
+            key: 'cache',
+            label: (
+              <Checkbox
+                checked={cacheLastOp}
+                onChange={onToggleCache}
+                onClick={e => e.stopPropagation()}
+                style={{ fontSize: 13 }}
+              >
+                缓存最后操作
+              </Checkbox>
+            ),
+            onClick: onToggleCache,
+          },
+          {
+            key: 'divider',
+            type: 'divider',
+            style: { margin: '4px 0' },
+          },
+          {
+            key: 'update',
+            label: (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ color: selectedView ? '#333' : '#bbb' }}>更新当前视图</span>
+                {!selectedView && (
+                  <span style={{ fontSize: 11, color: '#bbb' }}>未选视图</span>
+                )}
+              </div>
+            ),
+            disabled: !selectedView,
+            onClick: () => {
+              if (selectedView) { onUpdateView(); onClose(); }
+            },
+          },
+          {
+            key: 'saveas',
+            label: <span style={{ color: '#333' }}>另存为新视图</span>,
+            onClick: () => { onSaveAsNew(); onClose(); },
+          },
+        ]}
+      />
     </div>
   );
 }

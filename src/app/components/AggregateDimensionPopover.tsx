@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Check, GripVertical, X, ChevronDown } from 'lucide-react';
-
-const F = "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif";
+import { GripVertical } from 'lucide-react';
+import { Checkbox, Button, Select } from 'antd';
 
 type OrderMode = 'default' | 'custom';
 
@@ -63,28 +62,12 @@ function sortByDefinition(dims: string[]): string[] {
   return [TIME_KEY, ...nonTime];
 }
 
-// ── Small helper: remove button with hover color ──────────────────────────────
-function RemoveBtn({ onRemove }: { onRemove: () => void }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <div
-      onClick={e => { e.stopPropagation(); onRemove(); }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{ cursor: 'pointer', lineHeight: 0, flexShrink: 0 }}
-    >
-      <X size={12} color={hovered ? '#ff4d4f' : '#ccc'} />
-    </div>
-  );
-}
-
 // ── Main component ────────────────────────────────────────────────────────────
 export function AggregateDimensionPopover({
   activeDims, onChangeDims, onClose, timeGranularity, orderMode, onOrderModeChange,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [localDims, setLocalDims] = useState<string[]>(() => ensureTime(activeDims));
-  const [showModeDropdown, setShowModeDropdown] = useState(false);
   const [draggedKey, setDraggedKey] = useState<string | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
 
@@ -125,7 +108,6 @@ export function AggregateDimensionPopover({
   // ── Order mode ─────────────────────────────────────────────────────────────
   const handleSetMode = (mode: OrderMode) => {
     onOrderModeChange(mode);
-    setShowModeDropdown(false);
     if (mode === 'default') {
       const sorted = sortByDefinition(localDims);
       setLocalDims(sorted);
@@ -165,7 +147,7 @@ export function AggregateDimensionPopover({
         position: 'absolute', top: '100%', left: 0, zIndex: 1000,
         background: '#fff', borderRadius: 8,
         boxShadow: '0 6px 24px rgba(0,0,0,0.14)',
-        fontFamily: F, marginTop: 4,
+        marginTop: 4,
         border: '1px solid #e8e8e8',
         display: 'flex', flexDirection: 'column',
       }}
@@ -178,62 +160,20 @@ export function AggregateDimensionPopover({
       }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: '#333' }}>聚合维度</span>
 
-        {/* Order mode dropdown */}
+        {/* Order mode select */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 12, color: '#666', whiteSpace: 'nowrap' }}>维度列展示顺序</span>
-          <div style={{ position: 'relative' }}>
-            <div
-              onClick={() => setShowModeDropdown(v => !v)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '3px 8px', border: '1px solid #dee0e3', borderRadius: 4,
-                cursor: 'pointer', fontSize: 12, color: '#333', background: '#fff',
-                minWidth: 80, userSelect: 'none',
-              }}
-            >
-              <span style={{ flex: 1 }}>{isCustom ? '自定义' : '系统默认'}</span>
-              <ChevronDown
-                size={11} color="#aaa"
-                style={{ transform: showModeDropdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}
-              />
-            </div>
-
-            {/* Dropdown backdrop */}
-            {showModeDropdown && (
-              <div
-                style={{ position: 'fixed', inset: 0, zIndex: 9 }}
-                onClick={() => setShowModeDropdown(false)}
-              />
-            )}
-
-            {showModeDropdown && (
-              <div style={{
-                position: 'absolute', top: 'calc(100% + 2px)', left: 0,
-                background: '#fff', border: '1px solid #e8e8e8', borderRadius: 6,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.10)', zIndex: 10, minWidth: 90,
-                overflow: 'hidden',
-              }}>
-                {(['default', 'custom'] as const).map(m => {
-                  const active = orderMode === m;
-                  return (
-                    <div
-                      key={m}
-                      onClick={() => handleSetMode(m)}
-                      style={{
-                        padding: '7px 12px', fontSize: 12, cursor: 'pointer',
-                        color: active ? '#1890ff' : '#333',
-                        background: active ? '#e6f4ff' : 'transparent',
-                      }}
-                      onMouseEnter={e => { if (!active) (e.currentTarget as HTMLDivElement).style.background = '#f5f5f5'; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = active ? '#e6f4ff' : 'transparent'; }}
-                    >
-                      {m === 'default' ? '系统默认' : '自定义'}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          <Select
+            size="small"
+            value={orderMode}
+            onChange={handleSetMode}
+            style={{ width: 90, fontSize: 12 }}
+            getPopupContainer={() => ref.current || document.body}
+            options={[
+              { value: 'default', label: '系统默认' },
+              { value: 'custom', label: '自定义' },
+            ]}
+          />
         </div>
       </div>
 
@@ -251,27 +191,14 @@ export function AggregateDimensionPopover({
                 {group.items.map(item => {
                   const checked = localDims.includes(item.key);
                   return (
-                    <div
+                    <Checkbox
                       key={item.key}
-                      onClick={() => toggleDim(item.key)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 7,
-                        cursor: 'pointer', padding: '3px 0',
-                      }}
+                      checked={checked}
+                      onChange={() => toggleDim(item.key)}
+                      style={{ fontSize: 13 }}
                     >
-                      <div style={{
-                        width: 15, height: 15, borderRadius: 3, flexShrink: 0,
-                        border: `1.5px solid ${checked ? '#1890ff' : '#d9d9d9'}`,
-                        background: checked ? '#1890ff' : '#fff',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'all 0.15s',
-                      }}>
-                        {checked && <Check size={10} color="#fff" strokeWidth={2.5} />}
-                      </div>
-                      <span style={{ fontSize: 13, color: checked ? '#1890ff' : '#333' }}>
-                        {item.label}
-                      </span>
-                    </div>
+                      {item.label}
+                    </Checkbox>
                   );
                 })}
               </div>
@@ -325,7 +252,17 @@ export function AggregateDimensionPopover({
                     }}>
                       {label}{isTime && granLabel ? `(${granLabel})` : ''}
                     </span>
-                    {!isTime && <RemoveBtn onRemove={() => toggleDim(key)} />}
+                    {!isTime && (
+                      <Button
+                        type="text"
+                        size="small"
+                        danger
+                        onClick={e => { e.stopPropagation(); toggleDim(key); }}
+                        style={{ padding: 0, minWidth: 'unset', height: 'auto', lineHeight: 1, color: '#ccc' }}
+                      >
+                        ×
+                      </Button>
+                    )}
                   </div>
                 );
               })
@@ -339,14 +276,14 @@ export function AggregateDimensionPopover({
         padding: '8px 16px', borderTop: '1px solid #f0f0f0',
         display: 'flex', justifyContent: 'flex-end',
       }}>
-        <span
+        <Button
+          type="link"
+          size="small"
           onClick={handleClear}
-          style={{ fontSize: 12, color: '#1890ff', cursor: 'pointer', userSelect: 'none' }}
-          onMouseEnter={e => (e.currentTarget as HTMLSpanElement).style.color = '#40a9ff'}
-          onMouseLeave={e => (e.currentTarget as HTMLSpanElement).style.color = '#1890ff'}
+          style={{ fontSize: 12, padding: 0 }}
         >
           清空
-        </span>
+        </Button>
       </div>
     </div>
   );

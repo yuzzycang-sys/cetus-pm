@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from 'antd';
+import { LeftOutlined, RightOutlined } from '@ant-design/icons';
 
-const F = "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif";
 const WEEK_DAYS = ['日', '一', '二', '三', '四', '五', '六'];
 const QUICK_OPTS = ['今天', '昨天', '近7天', '近30天', '本月', '上月'];
 
@@ -109,7 +109,7 @@ export function DateRangePicker({ startDate, endDate, onChange, onClose, fixedLe
         zIndex: 9999,
         background: '#fff', borderRadius: 8,
         boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-        fontFamily: F, display: 'flex', flexDirection: 'column',
+        display: 'flex', flexDirection: 'column',
         border: '1px solid #e8e8e8',
       }}
     >
@@ -170,15 +170,13 @@ export function DateRangePicker({ startDate, endDate, onChange, onClose, fixedLe
         <span style={{ fontSize: 12, color: '#666' }}>
           {tempStart} ~ {tempEnd}
         </span>
-        <button
+        <Button
+          type="primary"
+          size="small"
           onClick={() => { onChange(tempStart, tempEnd); onClose(); }}
-          style={{
-            padding: '4px 14px', background: '#1890ff', color: '#fff',
-            border: 'none', borderRadius: 4, fontSize: 12, cursor: 'pointer',
-          }}
         >
           确定
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -199,7 +197,6 @@ function Calendar({ year, month, startDate, endDate, selecting, onDayClick, onDa
   const firstDay = getFirstDayOfMonth(year, month);
   const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 
-  // Build grid
   const cells: (number | null)[] = [];
   for (let i = 0; i < firstDay; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
@@ -215,21 +212,25 @@ function Calendar({ year, month, startDate, endDate, selecting, onDayClick, onDa
     <div style={{ width: 210 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <div
+        <Button
+          type="text"
+          size="small"
+          icon={<LeftOutlined />}
           onClick={showLeftArrow ? onPrevMonth : undefined}
-          style={{ cursor: showLeftArrow ? 'pointer' : 'default', opacity: showLeftArrow ? 1 : 0, lineHeight: 0, padding: 2 }}
-        >
-          <ChevronLeft size={14} color="#666" />
-        </div>
+          style={{ opacity: showLeftArrow ? 1 : 0, cursor: showLeftArrow ? 'pointer' : 'default', padding: '0 4px' }}
+          tabIndex={showLeftArrow ? 0 : -1}
+        />
         <span style={{ fontSize: 13, fontWeight: 500, color: '#333' }}>
           {year}年{monthNames[month]}
         </span>
-        <div
+        <Button
+          type="text"
+          size="small"
+          icon={<RightOutlined />}
           onClick={showRightArrow ? onNextMonth : undefined}
-          style={{ cursor: showRightArrow ? 'pointer' : 'default', opacity: showRightArrow ? 1 : 0, lineHeight: 0, padding: 2 }}
-        >
-          <ChevronRight size={14} color="#666" />
-        </div>
+          style={{ opacity: showRightArrow ? 1 : 0, cursor: showRightArrow ? 'pointer' : 'default', padding: '0 4px' }}
+          tabIndex={showRightArrow ? 0 : -1}
+        />
       </div>
 
       {/* Week headers */}

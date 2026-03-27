@@ -1,7 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { ChevronDown, Check, X } from 'lucide-react';
-
-const F = "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif";
+import { Button, Checkbox, Input, Segmented, Tag } from 'antd';
 
 type SubType   = 'id' | 'name';
 type MatchMode = 'exact' | 'fuzzy';
@@ -18,42 +16,14 @@ function parseTokens(raw: string): string[] {
   return raw.split(/[\n,，\s]+/).map(s => s.trim()).filter(Boolean);
 }
 
-function ModeToggle({ value, onChange }: { value: MatchMode; onChange: (v: MatchMode) => void }) {
-  return (
-    <div style={{
-      display: 'inline-flex', border: '1px solid #d9d9d9',
-      borderRadius: 4, overflow: 'hidden', fontSize: 12, flexShrink: 0,
-    }}>
-      {(['exact', 'fuzzy'] as const).map(m => {
-        const active = value === m;
-        return (
-          <div key={m} onClick={() => onChange(m)} style={{
-            padding: '2px 8px', cursor: 'pointer',
-            background: active ? '#1890ff' : '#fff',
-            color: active ? '#fff' : '#555',
-            userSelect: 'none', transition: 'background 0.12s',
-            borderRight: m === 'exact' ? '1px solid #d9d9d9' : 'none',
-          }}>
-            {m === 'exact' ? '精确' : '模糊'}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function KindBadge({ kind }: { kind: MatchMode }) {
-  const isExact = kind === 'exact';
   return (
-    <span style={{
-      fontSize: 10, lineHeight: '16px', padding: '0 4px', borderRadius: 3,
-      background: isExact ? '#f6ffed' : '#f9f0ff',
-      color:      isExact ? '#52c41a'  : '#722ed1',
-      border: `1px solid ${isExact ? '#b7eb8f' : '#d3adf7'}`,
-      whiteSpace: 'nowrap', flexShrink: 0,
-    }}>
-      {isExact ? '精确' : '模糊'}
-    </span>
+    <Tag
+      color={kind === 'exact' ? 'success' : 'purple'}
+      style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', margin: 0, flexShrink: 0, whiteSpace: 'nowrap' }}
+    >
+      {kind === 'exact' ? '精确' : '模糊'}
+    </Tag>
   );
 }
 
@@ -64,14 +34,13 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
   const [inputText, setInputText] = useState('');
   const [dropPos, setDropPos]     = useState<{ left: number; top: number } | null>(null);
 
-  // 每个值对应的匹配方式
   const [valueMeta, setValueMeta] = useState<Record<string, MatchMode>>({});
 
   const wrapRef     = useRef<HTMLDivElement>(null);
   const btnRef      = useRef<HTMLButtonElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const closeTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 只依赖鼠标进出关闭：选中后不立即消失，鼠标移出后才消失
   useEffect(() => {
     return () => {
       if (closeTimer.current) {
@@ -94,9 +63,7 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
     setOpen(v => !v);
   };
 
-  // 解析当前输入
   const tokens = useMemo(() => parseTokens(inputText), [inputText]);
-  // 去掉已经在 selected 里的（避免重复添加提示混淆）
   const newTokens = useMemo(() => tokens.filter(t => !selected.includes(t)), [tokens, selected]);
 
   const handleConfirm = () => {
@@ -125,7 +92,6 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
     setValueMeta({});
   };
 
-  // 触发器文案
   const subLabel = subType === 'id' ? `${entityLabel}ID` : `${entityLabel}名称`;
   const hasSelection = selected.length > 0;
   const activeColor  = exclude ? '#fa8c16' : '#1890ff';
@@ -142,9 +108,7 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
     displayValue = selected.length > 2 ? `${names} 等${selected.length}项` : names;
   }
 
-  // 确认按钮是否可用
   const canConfirm = newTokens.length > 0;
-  // 重复项数
   const dupCount = tokens.length - newTokens.length;
 
   return (
@@ -156,11 +120,11 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
         onClick={handleToggle}
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 4,
-          border: `1px solid ${(open || hasSelection) ? activeColor : '#dee0e3'}`,
+          border: `1px solid ${(open || hasSelection) ? activeColor : '#d9d9d9'}`,
           borderRadius: 4, padding: '0 8px', height: 28,
           background: hasSelection ? activeBg : open ? '#f5f5f5' : '#fff',
           cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap',
-          outline: 'none', transition: 'all 0.15s', fontFamily: F,
+          outline: 'none', transition: 'all 0.15s',
         }}
       >
         <span style={{ color: '#555' }}>{subLabel}:</span>
@@ -170,20 +134,28 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
         }}>
           {displayValue}
         </span>
-        <ChevronDown
-          size={11} color={hasSelection ? activeColor : '#aaa'}
-          style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }}
-        />
+        <svg
+          width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={hasSelection ? activeColor : '#aaa'}
+          strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
+          style={{ flexShrink: 0, transition: 'transform 0.15s', transform: open ? 'rotate(180deg)' : 'none' }}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
       </button>
 
       {/* 下拉面板 */}
       {open && dropPos && (
-        <div onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onMouseLeave={() => setOpen(false)} style={{
-          position: 'fixed', left: dropPos.left, top: dropPos.top,
-          zIndex: 9999, background: '#fff', borderRadius: 8,
-          border: '1px solid #e8e8e8', boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
-          width: 300, fontFamily: F, overflow: 'hidden',
-        }}>
+        <div
+          onMouseDown={e => e.stopPropagation()}
+          onClick={e => e.stopPropagation()}
+          onMouseLeave={() => setOpen(false)}
+          style={{
+            position: 'fixed', left: dropPos.left, top: dropPos.top,
+            zIndex: 9999, background: '#fff', borderRadius: 8,
+            border: '1px solid #e8e8e8', boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
+            width: 300, overflow: 'hidden',
+          }}
+        >
 
           {/* ── 顶栏：子类型 tab + 匹配方式 ── */}
           <div style={{
@@ -199,7 +171,6 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
                 return (
                   <div key={t} onClick={() => {
                     if (t === subType) return;
-                    // 互斥：切换类型时清空所有已选值和元信息
                     setSubType(t);
                     onChange([]);
                     onExcludeChange(false);
@@ -218,13 +189,22 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
               })}
             </div>
             {/* 匹配方式 */}
-            <ModeToggle value={matchMode} onChange={setMatchMode} />
+            <Segmented
+              size="small"
+              value={matchMode}
+              onChange={v => setMatchMode(v as MatchMode)}
+              options={[
+                { label: '精确', value: 'exact' },
+                { label: '模糊', value: 'fuzzy' },
+              ]}
+              style={{ fontSize: 12, flexShrink: 0 }}
+            />
           </div>
 
           {/* ── Textarea（主输入区） ── */}
           <div style={{ padding: '10px 12px 0' }}>
-            <textarea
-              ref={textareaRef}
+            <Input.TextArea
+              ref={textareaRef as React.Ref<any>}
               value={inputText}
               onChange={e => setInputText(e.target.value)}
               placeholder={
@@ -234,15 +214,10 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
               }
               rows={5}
               style={{
-                width: '100%', boxSizing: 'border-box',
-                border: '1px solid #e0e0e0', borderRadius: 5,
-                padding: '8px 10px', fontSize: 12, color: '#333',
-                resize: 'none', outline: 'none', lineHeight: 1.8,
-                fontFamily: F, background: '#fafafa',
-                transition: 'border-color 0.15s',
+                fontSize: 12, color: '#333',
+                resize: 'none', lineHeight: 1.8,
+                background: '#fafafa',
               }}
-              onFocus={e => { e.currentTarget.style.borderColor = '#1890ff'; }}
-              onBlur={e  => { e.currentTarget.style.borderColor = '#e0e0e0'; }}
             />
 
             {/* 解析结果提示行 */}
@@ -267,24 +242,19 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
 
           {/* ── 确认按钮 ── */}
           <div style={{ padding: '6px 12px 0' }}>
-            <button
-              onClick={handleConfirm}
+            <Button
+              block
+              type="primary"
               disabled={!canConfirm}
-              style={{
-                width: '100%', padding: '7px 0', borderRadius: 4,
-                border: 'none', fontSize: 13, fontFamily: F,
-                background: canConfirm
-                  ? (matchMode === 'fuzzy' ? '#7c4dff' : '#1890ff')
-                  : '#f0f0f0',
-                color: canConfirm ? '#fff' : '#bbb',
-                cursor: canConfirm ? 'pointer' : 'not-allowed',
-                transition: 'background 0.15s',
-              }}
+              onClick={handleConfirm}
+              style={canConfirm && matchMode === 'fuzzy'
+                ? { background: '#7c4dff', borderColor: '#7c4dff' }
+                : undefined}
             >
               {canConfirm
                 ? `添加 ${newTokens.length} 项`
                 : tokens.length > 0 ? '所有值已存在' : '请输入内容'}
-            </button>
+            </Button>
           </div>
 
           {/* ── 已选列表 ── */}
@@ -295,12 +265,14 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
                 <span style={{ fontSize: 11, color: '#999' }}>已添加 {selected.length} 项</span>
-                <span
+                <Button
+                  type="link"
+                  size="small"
                   onClick={handleClear}
-                  style={{ fontSize: 11, color: '#1890ff', cursor: 'pointer', userSelect: 'none' }}
+                  style={{ fontSize: 11, padding: 0, height: 'auto' }}
                 >
                   清空
-                </span>
+                </Button>
               </div>
 
               <div style={{ maxHeight: 150, overflowY: 'auto', padding: '0 0 4px' }}>
@@ -318,10 +290,15 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
                       {v}
                     </span>
                     {valueMeta[v] && <KindBadge kind={valueMeta[v]} />}
-                    <X
-                      size={13} color="#bbb" style={{ cursor: 'pointer', flexShrink: 0 }}
-                      onClick={() => handleRemove(v)}
+                    <Tag
+                      closable
+                      onClose={() => handleRemove(v)}
+                      style={{ display: 'none' }}
                     />
+                    <span
+                      style={{ cursor: 'pointer', color: '#bbb', flexShrink: 0, fontSize: 13 }}
+                      onClick={() => handleRemove(v)}
+                    >✕</span>
                   </div>
                 ))}
               </div>
@@ -340,15 +317,7 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
                 onClick={() => onExcludeChange(!exclude)}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}
               >
-                <div style={{
-                  width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-                  border: `1.5px solid ${exclude ? '#fa8c16' : '#d9d9d9'}`,
-                  background: exclude ? '#fa8c16' : '#fff',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'all 0.12s',
-                }}>
-                  {exclude && <Check size={10} color="#fff" strokeWidth={3} />}
-                </div>
+                <Checkbox checked={exclude} style={{ pointerEvents: 'none' }} />
                 <span style={{ fontSize: 12, color: exclude ? '#fa8c16' : '#444' }}>排除</span>
               </div>
             </div>

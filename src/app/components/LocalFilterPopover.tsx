@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Button, Input, Typography, Checkbox } from 'antd';
 import { Info, Search, X, ChevronDown, ChevronUp, Check, ArrowLeft } from 'lucide-react';
 import { FILTER_GROUPS, FILTER_CHIP_DATA } from './filterConfig';
 
-const F = "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif";
+const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
 
 export type LocalFilters = Record<string, string[]>;
 
@@ -276,15 +277,10 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
                   onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = '#f5f5f5'}
                   onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
                 >
-                  <div style={{
-                    width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-                    border: `1.5px solid ${checked ? '#1890ff' : '#d9d9d9'}`,
-                    background: checked ? '#1890ff' : '#fff',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: 'all 0.12s',
-                  }}>
-                    {checked && <Check size={10} color="#fff" strokeWidth={3} />}
-                  </div>
+                  <Checkbox
+                    checked={checked}
+                    style={{ pointerEvents: 'none', flexShrink: 0 }}
+                  />
                   <span style={{ flex: 1, color: checked ? '#1890ff' : '#333' }}>{opt}</span>
                   {kind && <KindBadge kind={kind} />}
                 </div>
@@ -307,14 +303,11 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
               opacity: selectAllDisabled ? 0.38 : 1, userSelect: 'none',
             }}
           >
-            <div style={{
-              width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-              border: `1.5px solid ${isAllSelected && !selectAllDisabled ? '#1890ff' : '#d9d9d9'}`,
-              background: isAllSelected && !selectAllDisabled ? '#1890ff' : '#fff',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.12s',
-            }}>
-              {isAllSelected && !selectAllDisabled && <Check size={10} color="#fff" strokeWidth={3} />}
-            </div>
+            <Checkbox
+              checked={isAllSelected && !selectAllDisabled}
+              disabled={selectAllDisabled}
+              style={{ pointerEvents: 'none', flexShrink: 0 }}
+            />
             <span style={{ fontSize: 12, color: '#444' }}>全选</span>
           </div>
 
@@ -454,11 +447,12 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
         )}
 
         <div style={{ padding: '10px 12px 12px' }}>
-          <button
+          <Button
             onClick={handleBatchConfirm}
             disabled={matchMode === 'exact' ? exactMatched.length === 0 : batchTokens.length === 0}
+            block
             style={{
-              width: '100%', padding: '7px 0', borderRadius: 5, border: 'none',
+              borderRadius: 5,
               background: (() => {
                 if (matchMode === 'exact') return exactMatched.length > 0 ? '#1890ff' : '#f0f0f0';
                 return batchTokens.length > 0 ? '#7c4dff' : '#f0f0f0';
@@ -467,12 +461,8 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
                 if (matchMode === 'exact') return exactMatched.length > 0 ? '#fff' : '#bbb';
                 return batchTokens.length > 0 ? '#fff' : '#bbb';
               })(),
+              border: 'none',
               fontSize: 13,
-              cursor: (() => {
-                if (matchMode === 'exact') return exactMatched.length > 0 ? 'pointer' : 'not-allowed';
-                return batchTokens.length > 0 ? 'pointer' : 'not-allowed';
-              })(),
-              transition: 'background 0.15s', fontFamily: F,
             }}
           >
             {matchMode === 'exact'
@@ -482,7 +472,7 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
               : batchTokens.length > 0
                 ? `确认追加 ${batchTokens.length} 个关键字（模糊匹配）`
                 : '请输入内容'}
-          </button>
+          </Button>
         </div>
       </>)}
     </div>
@@ -624,22 +614,21 @@ function TextInputPanel({ entityLabel, selected, onChangeSelected, exclude, onEx
 
       {/* Confirm button */}
       <div style={{ padding: '6px 12px 0' }}>
-        <button
+        <Button
           onClick={handleConfirm}
           disabled={!canConfirm}
+          block
           style={{
-            width: '100%', padding: '7px 0', borderRadius: 4,
-            border: 'none', fontSize: 13, fontFamily: F,
+            borderRadius: 4,
+            border: 'none',
             background: canConfirm ? (matchMode === 'fuzzy' ? '#7c4dff' : '#1890ff') : '#f0f0f0',
             color: canConfirm ? '#fff' : '#bbb',
-            cursor: canConfirm ? 'pointer' : 'not-allowed',
-            transition: 'background 0.15s',
           }}
         >
           {canConfirm
             ? `添加 ${newTokens.length} 项`
             : tokens.length > 0 ? '所有值已存在' : '请输入内容'}
-        </button>
+        </Button>
       </div>
 
       {/* Added list */}
@@ -649,10 +638,8 @@ function TextInputPanel({ entityLabel, selected, onChangeSelected, exclude, onEx
             padding: '8px 14px 4px',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           }}>
-            <span style={{ fontSize: 11, color: '#999' }}>已添加 {selected.length} 项</span>
-            <span onClick={handleClear} style={{ fontSize: 11, color: '#1890ff', cursor: 'pointer', userSelect: 'none' }}>
-              清空
-            </span>
+            <Typography.Text type="secondary" style={{ fontSize: 11 }}>已添加 {selected.length} 项</Typography.Text>
+            <Typography.Link onClick={handleClear} style={{ fontSize: 11 }}>清空</Typography.Link>
           </div>
 
           <div style={{ maxHeight: 150, overflowY: 'auto', padding: '0 0 4px' }}>
@@ -779,16 +766,18 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
         borderBottom: '1px solid #bae0ff', borderRadius: '8px 8px 0 0',
       }}>
         <Info size={14} color="#1890ff" style={{ flexShrink: 0, marginTop: 1 }} />
-        <span style={{ fontSize: 12, color: '#1677ff', lineHeight: 1.6 }}>
+        <Typography.Text style={{ fontSize: 12, color: '#1677ff', lineHeight: 1.6 }}>
           局部筛选仅对当前 Sheet 生效；与全局筛选相同维度冲突时，以局部筛选为准
-        </span>
+        </Typography.Text>
       </div>
 
       {/* Filter groups */}
       <div style={{ padding: '12px 16px 16px' }}>
         {FILTER_GROUPS.map((group, gi) => (
           <div key={group.group} style={{ marginBottom: gi < FILTER_GROUPS.length - 1 ? 16 : 0 }}>
-            <div style={{ fontSize: 12, color: '#999', marginBottom: 8 }}>{group.group}</div>
+            <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+              {group.group}
+            </Typography.Text>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {group.items.map(item => {
                 const active = isActive(item.key);
@@ -820,12 +809,13 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
                       <div
                         onClick={e => { e.stopPropagation(); handleCheckboxClick(item.key); }}
                         style={{
-                        width: 16, height: 16, borderRadius: 3, flexShrink: 0,
-                        border: `1.5px solid ${active ? activeColor : '#d9d9d9'}`,
-                        background: active ? activeColor : '#fff',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'all 0.15s',
-                      }}>
+                          width: 16, height: 16, borderRadius: 3, flexShrink: 0,
+                          border: `1.5px solid ${active ? activeColor : '#d9d9d9'}`,
+                          background: active ? activeColor : '#fff',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          transition: 'all 0.15s',
+                        }}
+                      >
                         {active && (
                           <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
                             <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -834,11 +824,11 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
                       </div>
 
                       {/* Label */}
-                      <span style={{ fontSize: 13, color: active ? activeColor : '#333', flexShrink: 0 }}>
+                      <Typography.Text style={{ fontSize: 13, color: active ? activeColor : '#333', flexShrink: 0 }}>
                         {item.label}
-                      </span>
+                      </Typography.Text>
 
-                      {/* Selected value chips — nowrap, overflow clipped, max 2 shown */}
+                      {/* Selected value chips */}
                       {active && selectedValues.length > 0 && (
                         <div style={{ display: 'flex', gap: 4, flexWrap: 'nowrap', flex: 1, minWidth: 0, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
                           {selectedValues.slice(0, 2).map(v => (
@@ -914,10 +904,10 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
           padding: '10px 16px', borderTop: '1px solid #f0f0f0',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
-          <span style={{ fontSize: 12, color: '#999' }}>已设置 {totalActive} 个维度条件</span>
-          <span onClick={handleClearAll} style={{ fontSize: 12, color: '#ff4d4f', cursor: 'pointer' }}>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>已设置 {totalActive} 个维度条件</Typography.Text>
+          <Typography.Link onClick={handleClearAll} style={{ fontSize: 12, color: '#ff4d4f' }}>
             清空全部
-          </span>
+          </Typography.Link>
         </div>
       )}
     </div>
