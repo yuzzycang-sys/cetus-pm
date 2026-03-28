@@ -696,7 +696,7 @@ export function QuickTagModal({ tags: initialTags, views, onSave, onClose }: Pro
               新增标签
             </Button>
             {!isNew && (
-              <Typography.Text type="secondary" style={{ fontSize: 12, marginLeft: 'auto' }}>
+              <Typography.Text type="secondary" style={{ fontSize: 12, marginLeft: 'auto', paddingRight: 32 }}>
                 最后更新时间：{formatUpdateTime(selectedTag?.updatedAt)}
               </Typography.Text>
             )}

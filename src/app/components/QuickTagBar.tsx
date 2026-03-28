@@ -109,8 +109,8 @@ export function QuickTagBar({ tags, onToggleTag, onManage, onReorderTags }: Prop
 
   return (
     <div style={{
-      height: 36, display: 'flex', alignItems: 'center',
-      borderBottom: 'none', padding: '0 16px',
+      display: 'flex', alignItems: 'center',
+      borderBottom: 'none', padding: '4px 16px 12px',
       background: 'transparent', gap: 8, flexShrink: 0, fontFamily: F,
     }}>
       <Button
@@ -155,14 +155,14 @@ function TagItem({ tag, styles, onToggle }: {
         display: 'inline-flex', alignItems: 'center', gap: 5,
         padding: '2px 10px', borderRadius: 4, cursor: 'pointer',
         fontSize: 12, userSelect: 'none', margin: 0,
-        border: `1px solid ${tag.active ? styles.border : '#d9d9d9'}`,
-        background: tag.active ? styles.bg : '#fafafa',
-        color: tag.active ? styles.text : '#666',
+        border: `1px solid ${styles.border}`,
+        background: tag.active ? styles.bg : '#fff',
+        color: styles.text,
       }}
     >
       <div style={{
         width: 13, height: 13, borderRadius: 2,
-        border: `1px solid ${tag.active ? styles.cbBg : '#d9d9d9'}`,
+        border: `1px solid ${styles.cbBg}`,
         background: tag.active ? styles.cbBg : '#fff',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0,

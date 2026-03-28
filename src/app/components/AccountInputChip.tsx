@@ -33,25 +33,29 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
   const [matchMode, setMatchMode] = useState<MatchMode>('exact');
   const [inputText, setInputText] = useState('');
   const [dropPos, setDropPos]     = useState<{ left: number; top: number } | null>(null);
+  const [hovered, setHovered]     = useState(false);
 
   const [valueMeta, setValueMeta] = useState<Record<string, MatchMode>>({});
 
   const wrapRef     = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const btnRef      = useRef<HTMLButtonElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const closeTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (closeTimer.current) {
-        clearTimeout(closeTimer.current);
-        closeTimer.current = null;
-      }
-    };
-  }, []);
 
   useEffect(() => {
     if (open) setTimeout(() => textareaRef.current?.focus(), 50);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (wrapRef.current?.contains(target) || dropdownRef.current?.contains(target)) return;
+      setOpen(false);
+      setInputText('');
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
   const handleToggle = () => {
@@ -112,43 +116,55 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
   const dupCount = tokens.length - newTokens.length;
 
   return (
-    <div ref={wrapRef} style={{ position: 'relative', flexShrink: 0 }}>
+    <div ref={wrapRef} style={{ position: 'relative', flexShrink: 0 }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
 
       {/* 触发器 */}
-      <button
-        ref={btnRef}
-        onClick={handleToggle}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
-          border: `1px solid ${(open || hasSelection) ? activeColor : '#d9d9d9'}`,
-          borderRadius: 4, padding: '0 8px', height: 28,
-          background: hasSelection ? activeBg : open ? '#f5f5f5' : '#fff',
-          cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap',
-          outline: 'none', transition: 'all 0.15s',
-        }}
-      >
-        <span style={{ color: '#555' }}>{subLabel}:</span>
-        <span style={{
-          color: hasSelection ? activeColor : '#bbb',
-          maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {displayValue}
-        </span>
-        <svg
-          width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={hasSelection ? activeColor : '#aaa'}
-          strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
-          style={{ flexShrink: 0, transition: 'transform 0.15s', transform: open ? 'rotate(180deg)' : 'none' }}
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 180, flexShrink: 0 }}>
+        <span style={{ fontSize: 13, color: '#333', whiteSpace: 'nowrap', fontWeight: 400, flexShrink: 0 }}>{subLabel}</span>
+        <button
+          ref={btnRef}
+          onClick={handleToggle}
+          style={{
+            flex: 1, display: 'flex', alignItems: 'center', gap: 4,
+            border: `1px solid ${open ? '#1677ff' : '#e0e0e0'}`,
+            borderRadius: 6, padding: '0 8px 0 10px', height: 28,
+            background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 400,
+            outline: 'none', transition: 'border-color 0.15s', minWidth: 0,
+          }}
         >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
+          <span style={{
+            flex: 1, minWidth: 0, color: hasSelection ? (exclude ? '#fa8c16' : '#1677ff') : '#bbb',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            textAlign: 'left',
+          }}>
+            {displayValue}
+          </span>
+          {hasSelection && hovered ? (
+            <span
+              onClick={e => { e.stopPropagation(); handleClear(); }}
+              style={{ flexShrink: 0, color: '#bbb', fontSize: 15, lineHeight: 1, display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+              onMouseEnter={e => (e.currentTarget as HTMLSpanElement).style.color = '#999'}
+              onMouseLeave={e => (e.currentTarget as HTMLSpanElement).style.color = '#bbb'}
+            >×</span>
+          ) : (
+            <svg
+              width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#bbb"
+              strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
+              style={{ flexShrink: 0, transition: 'transform 0.15s', transform: open ? 'rotate(180deg)' : 'none' }}
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          )}
+        </button>
+      </div>
 
       {/* 下拉面板 */}
       {open && dropPos && (
         <div
-          onMouseDown={e => e.stopPropagation()}
-          onClick={e => e.stopPropagation()}
-          onMouseLeave={() => setOpen(false)}
+          ref={dropdownRef}
           style={{
             position: 'fixed', left: dropPos.left, top: dropPos.top,
             zIndex: 9999, background: '#fff', borderRadius: 8,
@@ -189,6 +205,11 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
               })}
             </div>
             {/* 匹配方式 */}
+            <style>{`
+              .ac-match-seg .ant-segmented-item { font-size: 12px !important; font-weight: 400 !important; color: #8c8c8c; }
+              .ac-match-seg .ant-segmented-item-selected { color: #1677ff !important; font-weight: 400 !important; }
+              .ac-match-seg .ant-segmented-item-label { font-size: 12px !important; }
+            `}</style>
             <Segmented
               size="small"
               value={matchMode}
@@ -197,7 +218,8 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
                 { label: '精确', value: 'exact' },
                 { label: '模糊', value: 'fuzzy' },
               ]}
-              style={{ fontSize: 12, flexShrink: 0 }}
+              className="ac-match-seg"
+              style={{ flexShrink: 0 }}
             />
           </div>
 

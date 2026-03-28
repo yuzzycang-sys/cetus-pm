@@ -66,35 +66,42 @@ export function ViewSelectorDropdown({ views, selectedView, onSelect, onTogglePi
       ref={ref}
       style={{
         position: 'fixed', top: fixedTop, left: fixedLeft, zIndex: 99999,
-        width: 350, background: '#fff', borderRadius: 8,
+        width: 320, background: '#fff', borderRadius: 8,
         boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
       }}
     >
+      <style>{`
+        .view-sel-tabs .ant-tabs-tab { padding: 6px 8px !important; font-size: 12px !important; font-weight: 400 !important; flex: 1 !important; justify-content: center !important; }
+        .view-sel-tabs .ant-tabs-tab-active .ant-tabs-tab-btn { font-weight: 500 !important; }
+        .view-sel-tabs .ant-tabs-nav { margin-bottom: 0 !important; }
+        .view-sel-tabs .ant-tabs-nav-list { width: 100% !important; }
+      `}</style>
       {/* Tabs */}
       <Tabs
         activeKey={activeTab}
         onChange={key => setActiveTab(key as Tab)}
         size="small"
+        className="view-sel-tabs"
         style={{ marginBottom: 0 }}
         tabBarStyle={{ margin: 0, paddingLeft: 8, paddingRight: 8 }}
         items={tabs.map(t => ({ key: t.key, label: t.label }))}
       />
 
       {/* Search */}
-      <div style={{ padding: '8px 12px' }}>
+      <div style={{ padding: '6px 10px' }}>
         <Input
           size="small"
-          prefix={<SearchOutlined style={{ color: '#aaa', fontSize: 13 }} />}
+          prefix={<SearchOutlined style={{ color: '#aaa', fontSize: 12 }} />}
           value={searchText}
           onChange={e => setSearchText(e.target.value)}
           placeholder="搜索视图名称"
-          style={{ fontSize: 12, background: '#f5f5f5', borderColor: 'transparent' }}
+          style={{ fontSize: 12, background: '#f5f5f5', borderColor: 'transparent', height: 26 }}
           variant="filled"
         />
       </div>
 
       {/* List */}
-      <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+      <div style={{ maxHeight: 280, overflowY: 'auto' }}>
         {filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '24px 0', fontSize: 13, color: '#aaa' }}>
             暂无视图
@@ -216,7 +223,7 @@ function ViewRow({ view, isSelected, pinLimitReached, onSelect, onTogglePin, onS
           <div style={{
             position: 'absolute', right: 0, bottom: '120%',
             background: 'rgba(0,0,0,0.75)', color: '#fff',
-            fontSize: 12, padding: '4px 8px', borderRadius: 4,
+            fontSize: 12, padding: '4px 8px', borderRadius: 6,
             whiteSpace: 'nowrap', zIndex: 10,
           }}>
             置顶数量已达上限 10

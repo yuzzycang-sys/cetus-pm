@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Button, Input, Typography, Checkbox } from 'antd';
+import { Button, Input, Typography, Checkbox, Segmented } from 'antd';
 import { Info, Search, X, ChevronDown, ChevronUp, Check, ArrowLeft } from 'lucide-react';
 import { FILTER_GROUPS, FILTER_CHIP_DATA } from './filterConfig';
+import { DateRangeTrigger } from './DateRangePicker';
 
 const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
 
-export type LocalFilters = Record<string, string[]>;
+export type LocalFilterEntry = { values: string[]; exclude?: boolean };
+export type LocalFilters = Record<string, LocalFilterEntry>;
 
 type MatchMode = 'exact' | 'fuzzy';
 
@@ -40,25 +42,24 @@ function KindBadge({ kind }: { kind: MatchMode }) {
 
 function ModeToggle({ value, onChange }: { value: MatchMode; onChange: (v: MatchMode) => void }) {
   return (
-    <div style={{
-      display: 'inline-flex', border: '1px solid #d9d9d9',
-      borderRadius: 4, overflow: 'hidden', fontSize: 12, flexShrink: 0,
-    }}>
-      {(['exact', 'fuzzy'] as const).map(m => {
-        const active = value === m;
-        return (
-          <div key={m} onClick={() => onChange(m)} style={{
-            padding: '3px 9px', cursor: 'pointer',
-            background: active ? '#1890ff' : '#fff',
-            color: active ? '#fff' : '#555',
-            userSelect: 'none', transition: 'background 0.12s, color 0.12s',
-            borderRight: m === 'exact' ? '1px solid #d9d9d9' : 'none',
-          }}>
-            {m === 'exact' ? '精确' : '模糊'}
-          </div>
-        );
-      })}
-    </div>
+    <>
+      <style>{`
+        .lf-match-seg .ant-segmented-item { font-size: 12px !important; font-weight: 400 !important; color: #8c8c8c; }
+        .lf-match-seg .ant-segmented-item-selected { color: #1677ff !important; font-weight: 400 !important; }
+        .lf-match-seg .ant-segmented-item-label { font-size: 12px !important; }
+      `}</style>
+      <Segmented
+        size="small"
+        value={value}
+        onChange={v => onChange(v as MatchMode)}
+        options={[
+          { label: '精确', value: 'exact' },
+          { label: '模糊', value: 'fuzzy' },
+        ]}
+        className="lf-match-seg"
+        style={{ flexShrink: 0 }}
+      />
+    </>
   );
 }
 
@@ -69,15 +70,16 @@ interface ItemPanelProps {
   options: string[];
   selected: string[];
   onChangeSelected: (next: string[]) => void;
+  exclude: boolean;
+  onExcludeChange: (v: boolean) => void;
 }
 
-function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProps) {
+function ItemPanel({ label, options, selected, onChangeSelected, exclude, onExcludeChange }: ItemPanelProps) {
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState<'all' | 'selected'>('all');
   const [mode, setMode] = useState<'list' | 'batch'>('list');
   const [batchText, setBatchText] = useState('');
   const [matchMode, setMatchMode] = useState<MatchMode>('exact');
-  const [exclude, setExclude] = useState(false);
   const [customMeta, setCustomMeta] = useState<Record<string, MatchMode>>({});
 
   const searchRef = useRef<HTMLInputElement>(null);
@@ -90,7 +92,7 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
 
   // Reset exclude when all selections cleared externally
   useEffect(() => {
-    if (selected.length === 0) setExclude(false);
+    if (selected.length === 0) onExcludeChange(false);
   }, [selected.length]);
 
   const optionSet = useMemo(() => new Set(options), [options]);
@@ -142,12 +144,12 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
 
   const handleExclude = () => {
     if (excludeDisabled) return;
-    setExclude(v => !v);
+    onExcludeChange(!exclude);
   };
 
   const handleClear = () => {
     onChangeSelected([]);
-    setExclude(false);
+    onExcludeChange(false);
     setCustomMeta({});
   };
 
@@ -188,7 +190,7 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
         <div style={{ padding: '10px 12px 0' }}>
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
-            border: '1px solid #e0e0e0', borderRadius: 5,
+            border: '1px solid #e0e0e0', borderRadius: 6,
             padding: '5px 9px', background: '#fafafa',
           }}>
             <Search size={12} color="#bbb" style={{ flexShrink: 0 }} />
@@ -392,7 +394,7 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
             rows={5}
             style={{
               width: '100%', boxSizing: 'border-box',
-              border: '1px solid #e0e0e0', borderRadius: 5,
+              border: '1px solid #e0e0e0', borderRadius: 6,
               padding: '8px 10px', fontSize: 12, color: '#333',
               resize: 'none', outline: 'none', lineHeight: 1.7,
               fontFamily: F, background: '#fafafa',
@@ -452,7 +454,7 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
             disabled={matchMode === 'exact' ? exactMatched.length === 0 : batchTokens.length === 0}
             block
             style={{
-              borderRadius: 5,
+              borderRadius: 6,
               background: (() => {
                 if (matchMode === 'exact') return exactMatched.length > 0 ? '#1890ff' : '#f0f0f0';
                 return batchTokens.length > 0 ? '#7c4dff' : '#f0f0f0';
@@ -589,7 +591,7 @@ function TextInputPanel({ entityLabel, selected, onChangeSelected, exclude, onEx
           rows={4}
           style={{
             width: '100%', boxSizing: 'border-box',
-            border: '1px solid #e0e0e0', borderRadius: 5,
+            border: '1px solid #e0e0e0', borderRadius: 6,
             padding: '8px 10px', fontSize: 12, color: '#333',
             resize: 'none', outline: 'none', lineHeight: 1.8,
             fontFamily: F, background: '#fafafa', transition: 'border-color 0.15s',
@@ -619,7 +621,7 @@ function TextInputPanel({ entityLabel, selected, onChangeSelected, exclude, onEx
           disabled={!canConfirm}
           block
           style={{
-            borderRadius: 4,
+            borderRadius: 6,
             border: 'none',
             background: canConfirm ? (matchMode === 'fuzzy' ? '#7c4dff' : '#1890ff') : '#f0f0f0',
             color: canConfirm ? '#fff' : '#bbb',
@@ -691,11 +693,13 @@ function TextInputPanel({ entityLabel, selected, onChangeSelected, exclude, onEx
 export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-  const [localExcludes, setLocalExcludes] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      const t = e.target as HTMLElement;
+      if (ref.current?.contains(t)) return;
+      if (t.closest('[data-date-range-portal]')) return;
+      onClose();
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -704,7 +708,7 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
   const top = anchorRect.bottom + 6;
   const left = anchorRect.left;
 
-  const isActive = (key: string) => (localFilters[key]?.length ?? 0) > 0;
+  const isActive = (key: string) => (localFilters[key]?.values?.length ?? 0) > 0;
 
   const handleCheckboxClick = (key: string) => {
     if (isActive(key)) {
@@ -719,21 +723,20 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
 
   const handleRemoveValue = (key: string, value: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const current = localFilters[key] || [];
+    const current = localFilters[key]?.values || [];
     const next = current.filter(v => v !== value);
     if (next.length === 0) {
       const nextFilters = { ...localFilters };
       delete nextFilters[key];
       onChangeFilters(nextFilters);
     } else {
-      onChangeFilters({ ...localFilters, [key]: next });
+      onChangeFilters({ ...localFilters, [key]: { ...localFilters[key], values: next } });
     }
   };
 
   const handleClearAll = () => {
     onChangeFilters({});
     setExpandedKey(null);
-    setLocalExcludes({});
   };
 
   const handleChangeItemSelected = (key: string, next: string[]) => {
@@ -742,55 +745,76 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
       delete nextFilters[key];
       onChangeFilters(nextFilters);
     } else {
-      onChangeFilters({ ...localFilters, [key]: next });
+      onChangeFilters({ ...localFilters, [key]: { ...localFilters[key], values: next } });
     }
   };
 
-  const totalActive = Object.values(localFilters).filter(v => v.length > 0).length;
+  const handleChangeItemExclude = (key: string, exclude: boolean) => {
+    if (!localFilters[key]) return;
+    onChangeFilters({ ...localFilters, [key]: { ...localFilters[key], exclude } });
+  };
+
+  const totalActive = Object.values(localFilters).filter(v => (v.values?.length ?? 0) > 0).length;
 
   return (
     <div
       ref={ref}
       style={{
         position: 'fixed', top, left, zIndex: 9999,
-        width: 460, maxHeight: 580, overflowY: 'auto',
+        width: 460, maxHeight: 580,
         background: '#fff', borderRadius: 8,
-        boxShadow: '0 6px 24px rgba(0,0,0,0.12)',
+        boxShadow: '0 6px 24px rgba(0,0,0,0.14)',
         border: '1px solid #e8e8e8', fontFamily: F,
+        display: 'flex', flexDirection: 'column',
       }}
     >
-      {/* Info banner */}
+      {/* Header */}
       <div style={{
-        display: 'flex', alignItems: 'flex-start', gap: 8,
-        padding: '10px 16px', background: '#e6f4ff',
-        borderBottom: '1px solid #bae0ff', borderRadius: '8px 8px 0 0',
+        padding: '10px 16px', borderBottom: '1px solid #e8e8e8',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 16, flexShrink: 0,
       }}>
-        <Info size={14} color="#1890ff" style={{ flexShrink: 0, marginTop: 1 }} />
-        <Typography.Text style={{ fontSize: 12, color: '#1677ff', lineHeight: 1.6 }}>
-          局部筛选仅对当前 Sheet 生效；与全局筛选相同维度冲突时，以局部筛选为准
-        </Typography.Text>
+        <span style={{ fontSize: 13, fontWeight: 400, color: '#333' }}>局部筛选</span>
+        <span style={{ fontSize: 12, color: '#aaa', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
+          <Info size={12} style={{ flexShrink: 0 }} />
+          仅对当前 Sheet 生效，与全局筛选冲突时以此为准
+        </span>
       </div>
 
       {/* Filter groups */}
-      <div style={{ padding: '12px 16px 16px' }}>
+      <div style={{ padding: '12px 16px 4px', overflowY: 'auto', flex: 1 }}>
         {FILTER_GROUPS.map((group, gi) => (
           <div key={group.group} style={{ marginBottom: gi < FILTER_GROUPS.length - 1 ? 16 : 0 }}>
-            <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
-              {group.group}
-            </Typography.Text>
+            <div style={{ fontSize: 12, color: '#aaa', marginBottom: 8 }}>{group.group}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {group.items.map(item => {
                 const active = isActive(item.key);
                 const expanded = expandedKey === item.key;
-                const selectedValues = localFilters[item.key] || [];
+                const selectedValues = localFilters[item.key]?.values || [];
                 const chipData = FILTER_CHIP_DATA[item.key];
                 const isTextInput = TEXT_INPUT_KEYS.has(item.key);
-                const itemExclude = isTextInput && !!localExcludes[item.key];
-                const activeColor = itemExclude ? '#fa8c16' : '#1890ff';
-                const activeBg    = itemExclude ? '#fff7e6' : '#f0f7ff';
-                const activeBorder = itemExclude ? '#ffd591' : '#bae0ff';
-                const chipBg     = itemExclude ? '#fff7e6' : '#e6f7ff';
+                const itemExclude = !!localFilters[item.key]?.exclude;
+                const activeColor = itemExclude ? '#fa8c16' : '#1677ff';
+                const chipBg     = itemExclude ? '#fff7e6' : '#e6f4ff';
                 const chipBorder  = itemExclude ? '#ffd591' : '#bae0ff';
+
+                // adCreateTime 使用日期范围选择器，与 FilterBar 消耗时间保持一致
+                if (item.key === 'adCreateTime') {
+                  return (
+                    <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 4px', borderRadius: 6 }}>
+                      <div onClick={e => { e.stopPropagation(); if (active) handleCheckboxClick(item.key); }} style={{ cursor: active ? 'pointer' : 'default' }}>
+                        <Checkbox checked={active} style={{ pointerEvents: 'none' }} />
+                      </div>
+                      <span style={{ fontSize: 13, color: active ? activeColor : '#333', whiteSpace: 'nowrap', flexShrink: 0 }}>{item.label}</span>
+                      <DateRangeTrigger
+                        start={selectedValues[0] || ''}
+                        end={selectedValues[1] || ''}
+                        onChange={(s, e) => handleChangeItemSelected(item.key, s || e ? [s, e] : [])}
+                        clearable={false}
+                      />
+                    </div>
+                  );
+                }
 
                 return (
                   <div key={item.key}>
@@ -798,35 +822,21 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
                     <div
                       style={{
                         display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '5px 6px', borderRadius: 4, cursor: 'pointer',
-                        background: active ? activeBg : 'transparent',
-                        border: `1px solid ${active ? activeBorder : 'transparent'}`,
-                        transition: 'all 0.15s',
+                        padding: '6px 4px', borderRadius: 6, cursor: 'pointer',
                       }}
+                      onMouseEnter={e => { if (!active) (e.currentTarget as HTMLDivElement).style.background = '#fafafa'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
                       onClick={() => setExpandedKey(prev => prev === item.key ? null : item.key)}
                     >
                       {/* Checkbox — only this clears the selection */}
-                      <div
-                        onClick={e => { e.stopPropagation(); handleCheckboxClick(item.key); }}
-                        style={{
-                          width: 16, height: 16, borderRadius: 3, flexShrink: 0,
-                          border: `1.5px solid ${active ? activeColor : '#d9d9d9'}`,
-                          background: active ? activeColor : '#fff',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          transition: 'all 0.15s',
-                        }}
-                      >
-                        {active && (
-                          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                            <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        )}
+                      <div onClick={e => { e.stopPropagation(); handleCheckboxClick(item.key); }}>
+                        <Checkbox checked={active} style={{ pointerEvents: 'none' }} />
                       </div>
 
                       {/* Label */}
-                      <Typography.Text style={{ fontSize: 13, color: active ? activeColor : '#333', flexShrink: 0 }}>
+                      <span style={{ fontSize: 13, color: active ? activeColor : '#333', flexShrink: 0 }}>
                         {item.label}
-                      </Typography.Text>
+                      </span>
 
                       {/* Selected value chips */}
                       {active && selectedValues.length > 0 && (
@@ -861,10 +871,7 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
 
                       {/* Expand toggle */}
                       {(chipData || isTextInput) && (
-                        <div
-                          onClick={e => { e.stopPropagation(); setExpandedKey(prev => prev === item.key ? null : item.key); }}
-                          style={{ color: '#bbb', flexShrink: 0, lineHeight: 0 }}
-                        >
+                        <div style={{ color: '#bbb', flexShrink: 0, lineHeight: 0, marginLeft: 'auto' }}>
                           {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                         </div>
                       )}
@@ -877,8 +884,8 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
                         entityLabel={item.key === 'accountId' ? '账号' : '广告'}
                         selected={selectedValues}
                         onChangeSelected={next => handleChangeItemSelected(item.key, next)}
-                        exclude={!!localExcludes[item.key]}
-                        onExcludeChange={v => setLocalExcludes(prev => ({ ...prev, [item.key]: v }))}
+                        exclude={itemExclude}
+                        onExcludeChange={v => handleChangeItemExclude(item.key, v)}
                       />
                     )}
                     {expanded && !isTextInput && chipData && (
@@ -888,6 +895,8 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
                         options={chipData.options}
                         selected={selectedValues}
                         onChangeSelected={next => handleChangeItemSelected(item.key, next)}
+                        exclude={itemExclude}
+                        onExcludeChange={v => handleChangeItemExclude(item.key, v)}
                       />
                     )}
                   </div>
@@ -899,17 +908,24 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
       </div>
 
       {/* Footer */}
-      {totalActive > 0 && (
-        <div style={{
-          padding: '10px 16px', borderTop: '1px solid #f0f0f0',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        }}>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>已设置 {totalActive} 个维度条件</Typography.Text>
-          <Typography.Link onClick={handleClearAll} style={{ fontSize: 12, color: '#ff4d4f' }}>
-            清空全部
-          </Typography.Link>
-        </div>
-      )}
+      <div style={{
+        padding: '8px 16px', borderTop: '1px solid #f0f0f0',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        flexShrink: 0,
+      }}>
+        <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+          {totalActive > 0 ? `已设置 ${totalActive} 个条件` : ''}
+        </span>
+        <Button
+          type="link"
+          size="small"
+          onClick={handleClearAll}
+          disabled={totalActive === 0}
+          style={{ fontSize: 12, padding: 0, color: totalActive > 0 ? '#ff4d4f' : '#d9d9d9' }}
+        >
+          清空全部
+        </Button>
+      </div>
     </div>
   );
 }

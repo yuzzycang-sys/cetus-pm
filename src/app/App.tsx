@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ConfigProvider } from 'antd';
 import { ExportModal } from './components/ExportModal';
 import { Toaster, toast } from 'sonner';
 import { Lock } from 'lucide-react';
@@ -9,7 +10,8 @@ import { FilterBar } from './components/FilterBar';
 import { QuickTagBar } from './components/QuickTagBar';
 import type { QuickTag } from './components/QuickTagBar';
 import { QuickTagModal } from './components/QuickTagModal';
-import { SheetTabBar } from './components/SheetTabBar';
+import { SheetTabBar, getCustomPart, buildFullName, GRAN_LABELS } from './components/SheetTabBar';
+import { LABEL_MAP } from './components/AggregateDimensionPopover';
 import { TableToolBar } from './components/TableToolBar';
 import { DataTable } from './components/DataTable';
 import { Pagination } from './components/Pagination';
@@ -54,6 +56,7 @@ interface SheetState {
   hasData: boolean;
   filterCombinations: FilterCombination[];
   activeFilterId: string | null;
+  dimAutoUpdate?: boolean;
 }
 
 const DEFAULT_SHEET_STATE: SheetState = {
@@ -72,13 +75,13 @@ const NEW_SHEET_STATE: SheetState = {
   activeFilterId: null,
 };
 
-const INITIAL_SHEETS = ['sheet1', 'sheet2', 'sheet3', 'sheet4'];
+const INITIAL_SHEETS = ['天-sheet1', '周-sheet2', '月-sheet3', '天-sheet4'];
 
 const INITIAL_SHEET_STATES: Record<string, SheetState> = {
-  sheet1: { timeGranularity: 'day',   activeDims: ['time', 'media', 'optimizer'], hasData: true, filterCombinations: [], activeFilterId: null },
-  sheet2: { timeGranularity: 'week',  activeDims: ['time', 'media'],              hasData: true, filterCombinations: [], activeFilterId: null },
-  sheet3: { timeGranularity: 'month', activeDims: ['time', 'game', 'optimizer'],  hasData: true, filterCombinations: [], activeFilterId: null },
-  sheet4: { timeGranularity: 'day',   activeDims: ['time'],                       hasData: true, filterCombinations: [], activeFilterId: null },
+  '天-sheet1': { timeGranularity: 'day',   activeDims: ['time', 'media', 'optimizer'], hasData: true, filterCombinations: [], activeFilterId: null },
+  '周-sheet2': { timeGranularity: 'week',  activeDims: ['time', 'media'],              hasData: true, filterCombinations: [], activeFilterId: null },
+  '月-sheet3': { timeGranularity: 'month', activeDims: ['time', 'game', 'optimizer'],  hasData: true, filterCombinations: [], activeFilterId: null },
+  '天-sheet4': { timeGranularity: 'day',   activeDims: ['time'],                       hasData: true, filterCombinations: [], activeFilterId: null },
 };
 
 const INITIAL_VIEWS: ViewItem[] = [
@@ -294,6 +297,30 @@ export default function App() {
     }));
   };
 
+  // Apply non-time dims as the custom part of the active sheet name
+  const handleApplyDimsToName = (dims: string[]) => {
+    const dimsCustom = dims.filter(d => d !== 'time').map(d => LABEL_MAP[d] ?? d).join('-');
+    const gran = currentSheetState.timeGranularity;
+    const newName = buildFullName(gran, dimsCustom);
+    handleRenameSheet(activeSheet, newName);
+  };
+
+  // When granularity changes, auto-update the sheet name prefix
+  const handleChangeGranularity = (g: 'day' | 'week' | 'month') => {
+    const oldName = activeSheet;
+    const customPart = getCustomPart(oldName);
+    const newBase = buildFullName(g, customPart);
+    if (newBase === oldName) { updateSheetState({ timeGranularity: g }); return; }
+    const newName = newBase.slice(0, 31);
+    setSheets(prev => prev.map(s => s === oldName ? newName : s));
+    setSheetStates(prev => {
+      const state = prev[oldName] || DEFAULT_SHEET_STATE;
+      const { [oldName]: _, ...rest } = prev;
+      return { ...rest, [newName]: { ...state, timeGranularity: g } };
+    });
+    setActiveSheet(newName);
+  };
+
   // ── handlers ─────────────────────────────────────────────────
   const pinnedViews = views.filter(v => v.pinned).map(v => v.name);
 
@@ -348,6 +375,7 @@ export default function App() {
     setPageStatus({ type: 'OK' });
     setSelectedView(name);
     setActivePinnedTag(null);
+    setActiveSheet(sheets[0]);
   };
 
   const handleClickPinnedTag = (name: string) => {
@@ -429,23 +457,26 @@ export default function App() {
 
   // Sheet operations
   const handleAddSheet = () => {
+    const defaultGran: 'day' | 'week' | 'month' = 'day';
     let n = sheets.length + 1;
-    let newName = `sheet${n}`;
-    while (sheets.includes(newName)) { n++; newName = `sheet${n}`; }
+    let newName = buildFullName(defaultGran, `sheet${n}`);
+    while (sheets.includes(newName)) { n++; newName = buildFullName(defaultGran, `sheet${n}`); }
     setSheets(prev => [...prev, newName]);
-    setSheetStates(prev => ({ ...prev, [newName]: { ...NEW_SHEET_STATE } }));
+    setSheetStates(prev => ({ ...prev, [newName]: { ...NEW_SHEET_STATE, timeGranularity: defaultGran } }));
     setActiveSheet(newName);
   };
 
   const handleRenameSheet = (oldName: string, newName: string) => {
-    if (!newName || sheets.includes(newName)) return;
-    setSheets(prev => prev.map(s => s === oldName ? newName : s));
+    if (!newName) return;
+    const truncated = newName.slice(0, 31);
+    if (truncated === oldName) return;
+    setSheets(prev => prev.map(s => s === oldName ? truncated : s));
     setSheetStates(prev => {
-      const next = { ...prev, [newName]: prev[oldName] || DEFAULT_SHEET_STATE };
+      const next = { ...prev, [truncated]: prev[oldName] || DEFAULT_SHEET_STATE };
       delete next[oldName];
       return next;
     });
-    if (activeSheet === oldName) setActiveSheet(newName);
+    if (activeSheet === oldName) setActiveSheet(truncated);
   };
 
   const handleDeleteSheet = (name: string) => {
@@ -456,9 +487,16 @@ export default function App() {
   };
 
   const handleCopySheet = (name: string) => {
-    let copyName = `${name}_副本`;
+    const gran = (sheetStates[name] || DEFAULT_SHEET_STATE).timeGranularity;
+    const customPart = getCustomPart(name);
+    let copyCustom = `${customPart}_副本`;
+    let copyName = buildFullName(gran, copyCustom).slice(0, 31);
     let i = 1;
-    while (sheets.includes(copyName)) copyName = `${name}_副本${++i}`;
+    while (sheets.includes(copyName)) {
+      copyCustom = `${customPart}_副本${i}`;
+      copyName = buildFullName(gran, copyCustom).slice(0, 31);
+      i++;
+    }
     const idx = sheets.indexOf(name);
     const next = [...sheets];
     next.splice(idx + 1, 0, copyName);
@@ -488,11 +526,12 @@ export default function App() {
   };
 
   return (
+    <ConfigProvider theme={{ token: { borderRadius: 6, borderRadiusSM: 6, borderRadiusLG: 6, fontSize: 13 } }}>
     <div style={{
       width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column',
       fontFamily: F, fontSize: 13, color: '#141414', background: '#fff', overflow: 'hidden',
     }}>
-      <Toaster position="top-center" duration={2000} expand={true} gap={8} toastOptions={{ style: { background: 'rgba(0,0,0,0.75)', color: '#fff', borderRadius: 6, padding: '8px 16px', fontSize: 13, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', textAlign: 'center', width: 'fit-content', margin: '0 auto' } }} />
+      <Toaster position="top-center" duration={1000} expand={true} gap={8} toastOptions={{ style: { background: 'rgba(0,0,0,0.75)', color: '#fff', borderRadius: 6, padding: '8px 16px', fontSize: 13, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', textAlign: 'center', width: 'fit-content', margin: '0 auto' } }} />
       <TopNav />
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -526,7 +565,7 @@ export default function App() {
           </div>
 
           {/* ── 内容区：有内边距 ── */}
-          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: 8, gap: 8 }}>
+          <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: 12, gap: 12 }}>
 
             {/* ── 卡片②：筛选区（筛选栏 + 快捷标签） ── */}
             <div style={{
@@ -585,6 +624,9 @@ export default function App() {
               <SheetTabBar
                 sheets={sheets}
                 activeSheet={activeSheet}
+                sheetGranularities={Object.fromEntries(
+                  sheets.map(s => [s, (sheetStates[s] || DEFAULT_SHEET_STATE).timeGranularity])
+                )}
                 onSelectSheet={handleSelectSheet}
                 onRenameSheet={handleRenameSheet}
                 onDeleteSheet={handleDeleteSheet}
@@ -595,9 +637,10 @@ export default function App() {
 
               <TableToolBar
                 timeGranularity={currentSheetState.timeGranularity}
-                onChangeGranularity={g => updateSheetState({ timeGranularity: g })}
+                onChangeGranularity={handleChangeGranularity}
                 activeDims={currentSheetState.activeDims}
                 onChangeDims={dims => updateSheetState({ activeDims: dims })}
+                onApplyDimsToName={handleApplyDimsToName}
                 viewMode={viewMode}
                 onChangeViewMode={setViewMode}
                 mergeView={mergeView}
@@ -613,6 +656,8 @@ export default function App() {
                 onDeleteFilter={handleDeleteFilter}
                 localFilters={localFilters}
                 onChangeLocalFilters={setLocalFilters}
+                dimAutoUpdate={currentSheetState.dimAutoUpdate ?? false}
+                onChangeDimAutoUpdate={v => updateSheetState({ dimAutoUpdate: v })}
               />
 
               {/* ── Scene 3: NO_PERMISSION empty state ── */}
@@ -678,5 +723,6 @@ export default function App() {
         />
       )}
     </div>
+    </ConfigProvider>
   );
 }

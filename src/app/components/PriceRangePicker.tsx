@@ -143,7 +143,7 @@ export function PriceRangePicker({
           gap: 8,
           padding: '8px 12px',
           background: '#f5f5f5',
-          borderRadius: 4,
+          borderRadius: 6,
           marginBottom: 8,
         }}>
           <InfoCircleOutlined style={{ fontSize: 14, color: '#555', flexShrink: 0, marginTop: 1 }} />
@@ -157,7 +157,7 @@ export function PriceRangePicker({
           gap: 8,
           padding: '8px 12px',
           background: '#f5f5f5',
-          borderRadius: 4,
+          borderRadius: 6,
         }}>
           <InfoCircleOutlined style={{ fontSize: 14, color: '#555', flexShrink: 0, marginTop: 1 }} />
           <Typography.Text style={{ fontSize: 12, color: '#666', lineHeight: 1.5 }}>

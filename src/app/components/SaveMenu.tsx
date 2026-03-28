@@ -28,13 +28,19 @@ export function SaveMenu({ selectedView, cacheLastOp, onToggleCache, onUpdateVie
       ref={ref}
       style={{
         position: 'absolute', top: '100%', left: 0, zIndex: 1000,
-        width: 180, background: '#fff', borderRadius: 6,
+        width: 168, background: '#fff', borderRadius: 6,
         boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
         fontFamily: F, marginTop: 4,
         border: '1px solid #e8e8e8',
       }}
     >
+      <style>{`
+        .save-menu .ant-menu-item { height: 32px !important; line-height: 32px !important; padding: 0 12px !important; font-size: 13px !important; }
+        .save-menu .ant-menu-item .ant-checkbox-wrapper { font-size: 12px !important; font-weight: 400 !important; }
+        .save-menu .ant-menu-item .ant-checkbox-wrapper span { font-weight: 400 !important; }
+      `}</style>
       <Menu
+        className="save-menu"
         selectable={false}
         style={{ border: 'none', borderRadius: 6, fontSize: 13 }}
         items={[
@@ -45,7 +51,7 @@ export function SaveMenu({ selectedView, cacheLastOp, onToggleCache, onUpdateVie
                 checked={cacheLastOp}
                 onChange={onToggleCache}
                 onClick={e => e.stopPropagation()}
-                style={{ fontSize: 13 }}
+                style={{ fontSize: 12, fontWeight: 400 }}
               >
                 缓存最后操作
               </Checkbox>

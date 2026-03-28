@@ -1,17 +1,18 @@
 import React, { useRef, useEffect } from 'react';
-import { Checkbox, Typography } from 'antd';
+import { Checkbox, Typography, Button } from 'antd';
 import { FILTER_GROUPS } from './filterConfig';
 
 interface Props {
   activeFilters: string[];
   onToggleFilter: (key: string) => void;
+  onClearAll: () => void;
   onClose: () => void;
   /** position: fixed coordinates from parent's getBoundingClientRect */
   fixedLeft: number;
   fixedTop: number;
 }
 
-export function AllFiltersPopover({ activeFilters, onToggleFilter, onClose, fixedLeft, fixedTop }: Props) {
+export function AllFiltersPopover({ activeFilters, onToggleFilter, onClearAll, onClose, fixedLeft, fixedTop }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -59,6 +60,19 @@ export function AllFiltersPopover({ activeFilters, onToggleFilter, onClose, fixe
           </div>
         ))}
       </div>
+
+      {activeFilters.length > 0 && (
+        <div style={{
+          padding: '8px 20px',
+          borderTop: '1px solid #f0f0f0',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <span style={{ fontSize: 12, color: '#8c8c8c' }}>已选 {activeFilters.length} 个筛选维度</span>
+          <Button type="link" size="small" onClick={onClearAll} style={{ fontSize: 12, padding: 0 }}>
+            清空
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

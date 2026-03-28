@@ -44,6 +44,7 @@ export function MultiSelectChip({
   const [batchText, setBatchText] = useState('');
   const [matchMode, setMatchMode] = useState<MatchMode>('exact');
   const [dropPos, setDropPos]     = useState<{ left: number; top: number } | null>(null);
+  const [hovered, setHovered]     = useState(false);
 
   const [customMeta, setCustomMeta] = useState<Record<string, CustomKind>>({});
 
@@ -52,40 +53,6 @@ export function MultiSelectChip({
   const btnRef        = useRef<HTMLButtonElement>(null);
   const searchRef     = useRef<HTMLInputElement>(null);
   const textareaRef   = useRef<HTMLTextAreaElement>(null);
-  const closeTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const ignoreLeave   = useRef(false);
-  const mouseInside   = useRef(false);
-
-  const clearCloseTimer = () => {
-    if (closeTimer.current) {
-      clearTimeout(closeTimer.current);
-      closeTimer.current = null;
-    }
-  };
-
-  const scheduleClose = () => {
-    if (ignoreLeave.current) return;
-    clearCloseTimer();
-    closeTimer.current = setTimeout(() => {
-      setOpen(false);
-      resetPopover();
-    }, 180);
-  };
-
-  const temporarilyIgnoreLeave = () => {
-    ignoreLeave.current = true;
-    window.setTimeout(() => {
-      ignoreLeave.current = false;
-      if (!mouseInside.current) scheduleClose();
-    }, 220);
-  };
-
-  useEffect(() => {
-    if (!open) return;
-    return () => {
-      clearCloseTimer();
-    };
-  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -95,21 +62,18 @@ export function MultiSelectChip({
 
   useEffect(() => {
     if (!open) return;
-    const dropdownEl = dropdownRef.current;
-    if (!dropdownEl) return;
-
-    const stopPropagation = (e: Event) => {
-      e.stopImmediatePropagation();
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        wrapRef.current?.contains(target) ||
+        dropdownRef.current?.contains(target)
+      ) return;
+      setOpen(false);
+      resetPopover();
     };
-
-    dropdownEl.addEventListener('mousedown', stopPropagation, true);
-    dropdownEl.addEventListener('touchstart', stopPropagation, true);
-
-    return () => {
-      dropdownEl.removeEventListener('mousedown', stopPropagation, true);
-      dropdownEl.removeEventListener('touchstart', stopPropagation, true);
-    };
-  }, [open, dropPos]);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
 
   const resetPopover = () => {
     setSearch('');
@@ -139,9 +103,6 @@ export function MultiSelectChip({
       : selected.filter(s => s.toLowerCase().includes(search.toLowerCase()));
 
   const toggleOption = (opt: string) => {
-    temporarilyIgnoreLeave();
-    clearCloseTimer();
-
     if (selected.includes(opt)) {
       onChange(selected.filter(s => s !== opt));
       if (customMeta[opt] !== undefined) {
@@ -162,9 +123,6 @@ export function MultiSelectChip({
 
   const handleSelectAll = () => {
     if (exclude) return;
-    temporarilyIgnoreLeave();
-    clearCloseTimer();
-
     if (isAllSelected) {
       const fs = new Set(filteredOptions);
       onChange(selected.filter(s => !fs.has(s)));
@@ -181,15 +139,11 @@ export function MultiSelectChip({
 
   const handleExclude = () => {
     if (!exclude && isAllSelected && !search) return;
-    temporarilyIgnoreLeave();
-    clearCloseTimer();
     onExcludeChange(!exclude);
     setOpen(true);
   };
 
   const handleClear = () => {
-    temporarilyIgnoreLeave();
-    clearCloseTimer();
     onChange([]);
     onExcludeChange(false);
     setCustomMeta({});
@@ -202,9 +156,6 @@ export function MultiSelectChip({
 
   const handleBatchConfirm = () => {
     if (batchTokens.length === 0) return;
-    temporarilyIgnoreLeave();
-    clearCloseTimer();
-
     if (matchMode === 'exact') {
       if (exactMatched.length === 0) return;
       const merged = Array.from(new Set([...selected, ...exactMatched]));
@@ -256,45 +207,53 @@ export function MultiSelectChip({
     <div
       ref={wrapRef}
       style={{ position: 'relative', flexShrink: 0 }}
-      onMouseEnter={() => { mouseInside.current = true; clearCloseTimer(); }}
-      onMouseLeave={() => { mouseInside.current = false; scheduleClose(); }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
-      {/* ── Trigger button ── */}
-      <button
-        ref={btnRef}
-        onMouseDown={() => { clearCloseTimer(); }}
-        onClick={handleToggle}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
-          border: `1px solid ${(open || isActive) ? activeColor : '#d9d9d9'}`,
-          borderRadius: 4, padding: '0 8px', height: 28,
-          background: isActive ? activeBg : open ? '#f5f5f5' : '#fff',
-          cursor: 'pointer', fontSize: 13,
-          whiteSpace: 'nowrap', outline: 'none',
-          transition: 'all 0.15s',
-        }}
-      >
-        <span style={{ color: '#555' }}>{label}:</span>
-        <span style={{
-          color: isActive ? activeColor : '#bbb',
-          maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {displayValue}
-        </span>
-        <svg
-          width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={isActive ? activeColor : '#aaa'}
-          strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: 'transform 0.15s', transform: open ? 'rotate(180deg)' : 'none' }}
+      {/* ── Trigger ── */}
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 180, flexShrink: 0 }}>
+        <span style={{ fontSize: 13, color: '#333', whiteSpace: 'nowrap', fontWeight: 400, flexShrink: 0 }}>{label}</span>
+        <button
+          ref={btnRef}
+          onClick={handleToggle}
+          style={{
+            flex: 1, display: 'flex', alignItems: 'center', gap: 4,
+            border: `1px solid ${open ? '#1677ff' : '#e0e0e0'}`,
+            borderRadius: 6, padding: '0 8px 0 10px', height: 28,
+            background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 400,
+            outline: 'none', transition: 'border-color 0.15s', minWidth: 0,
+          }}
         >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
+          <span style={{
+            flex: 1, minWidth: 0, color: isActive ? (exclude ? '#fa8c16' : '#1677ff') : '#bbb',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            textAlign: 'left',
+          }}>
+            {displayValue}
+          </span>
+          {isActive && hovered ? (
+            <span
+              onClick={e => { e.stopPropagation(); handleClear(); }}
+              style={{ flexShrink: 0, color: '#bbb', fontSize: 15, lineHeight: 1, display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+              onMouseEnter={e => (e.currentTarget as HTMLSpanElement).style.color = '#999'}
+              onMouseLeave={e => (e.currentTarget as HTMLSpanElement).style.color = '#bbb'}
+            >×</span>
+          ) : (
+            <svg
+              width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#bbb"
+              strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
+              style={{ flexShrink: 0, transition: 'transform 0.15s', transform: open ? 'rotate(180deg)' : 'none' }}
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          )}
+        </button>
+      </div>
 
       {/* ── Dropdown ── */}
       {open && dropPos && (
         <div
           ref={dropdownRef}
-          onMouseEnter={() => { mouseInside.current = true; clearCloseTimer(); }}
-          onMouseLeave={() => { mouseInside.current = false; scheduleClose(); }}
           style={{
             position: 'fixed',
             left: dropPos.left,
@@ -537,9 +496,9 @@ export function MultiSelectChip({
               <div style={{ flex: 1 }} />
               <span style={{ fontSize: 12, color: '#999', flexShrink: 0 }}>匹配方式</span>
               <style>{`
-                .match-mode-seg .ant-segmented-item { font-weight: 400 !important; color: #8c8c8c; font-size: 11px !important; }
-                .match-mode-seg .ant-segmented-item-selected { font-weight: 400 !important; color: #595959 !important; font-size: 11px !important; }
-                .match-mode-seg .ant-segmented-item-label { font-size: 11px !important; }
+                .match-mode-seg .ant-segmented-item { font-weight: 400 !important; color: #8c8c8c; font-size: 12px !important; }
+                .match-mode-seg .ant-segmented-item-selected { font-weight: 400 !important; color: #1677ff !important; font-size: 12px !important; }
+                .match-mode-seg .ant-segmented-item-label { font-size: 12px !important; }
               `}</style>
               <Segmented
                 size="small"

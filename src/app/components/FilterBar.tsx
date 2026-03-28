@@ -1,8 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { Filter, Calendar } from 'lucide-react';
+import { Filter } from 'lucide-react';
 import { Button, Divider } from 'antd';
 import { AllFiltersPopover } from './AllFiltersPopover';
-import { DateRangePicker } from './DateRangePicker';
+import { DateRangeTrigger } from './DateRangePicker';
+
+const DATE_RANGE_KEYS = new Set(['adCreateTime']);
 import { PriceRangePicker } from './PriceRangePicker';
 import { MultiSelectChip } from './MultiSelectChip';
 import { AccountInputChip } from './AccountInputChip';
@@ -35,15 +37,12 @@ export function FilterBar({
 }: Props) {
   const [showAllFilters, setShowAllFilters] = useState(false);
   const [allFilterPos, setAllFilterPos] = useState<{ left: number; top: number } | null>(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [datePickerPos, setDatePickerPos] = useState<{ left: number; top: number } | null>(null);
   const [showPriceRange, setShowPriceRange] = useState(false);
   const [priceRangePos, setPriceRangePos] = useState<{ left: number; top: number } | null>(null);
   const [filterExcludes, setFilterExcludes] = useState<Record<string, boolean>>({});
   // 账号ID/名称 组件的 exclude 状态单独维护
   const [accountExclude, setAccountExclude] = useState(false);
   const filterBtnRef = useRef<HTMLButtonElement>(null);
-  const dateBtnRef = useRef<HTMLButtonElement>(null);
   const priceBtnRef = useRef<HTMLButtonElement>(null);
 
   const handleOpenAllFilters = () => {
@@ -52,14 +51,6 @@ export function FilterBar({
       setAllFilterPos({ left: r.left, top: r.bottom + 6 });
     }
     setShowAllFilters(v => !v);
-  };
-
-  const handleOpenDatePicker = () => {
-    if (!showDatePicker && dateBtnRef.current) {
-      const r = dateBtnRef.current.getBoundingClientRect();
-      setDatePickerPos({ left: r.left, top: r.bottom + 6 });
-    }
-    setShowDatePicker(v => !v);
   };
 
   const handleOpenPriceRange = () => {
@@ -86,10 +77,9 @@ export function FilterBar({
 
   return (
     <div style={{
-      height: 44, display: 'flex', alignItems: 'center',
-      borderBottom: 'none', padding: '0 16px',
-      background: 'transparent', gap: 0, flexShrink: 0, fontFamily: F,
-      overflowX: 'auto', overflowY: 'hidden',
+      display: 'flex', alignItems: 'center', flexWrap: 'wrap',
+      borderBottom: 'none', padding: '10px 16px 6px',
+      background: 'transparent', gap: 8, flexShrink: 0, fontFamily: F,
     }}>
       {/* ── 所有筛选 ── */}
       <Button
@@ -101,71 +91,81 @@ export function FilterBar({
         icon={<Filter size={13} />}
         style={{
           display: 'inline-flex', alignItems: 'center',
-          height: 28, fontSize: 13, flexShrink: 0, marginRight: 10,
+          height: 28, fontSize: 13, fontWeight: 400, flexShrink: 0,
         }}
       >
         所有筛选
       </Button>
 
       {/* ── 消耗时间（permanent，无竖线） ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginRight: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
         <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>消耗时间</span>
-        <Button
-          ref={dateBtnRef}
-          onClick={handleOpenDatePicker}
-          size="small"
-          type="default"
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            height: 28, fontSize: 13, whiteSpace: 'nowrap',
-            borderColor: showDatePicker ? '#1677ff' : undefined,
-          }}
-        >
-          <span>{dateStart}</span>
-          <span style={{ color: '#bbb' }}>→</span>
-          <span>{dateEnd}</span>
-          <Calendar size={12} color="#aaa" />
-        </Button>
+        <DateRangeTrigger
+          start={dateStart}
+          end={dateEnd}
+          onChange={onDateChange}
+          clearable={false}
+        />
       </div>
 
       {/* ── Active filter chips（有竖分割线） ── */}
       {activeFilters.length > 0 && (
         <>
-          <Divider type="vertical" style={{ height: 20, marginRight: 10 }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Divider type="vertical" style={{ height: 20 }} />
+          <div style={{ display: 'contents' }}>
             {activeFilters.map(key => {
               const cfg = FILTER_CHIP_DATA[key];
               if (!cfg) {
                 // Special case for priceRange
                 if (key === 'priceRange') {
                   return (
-                    <Button
-                      key={key}
-                      ref={priceBtnRef}
-                      onClick={handleOpenPriceRange}
-                      size="small"
-                      type="default"
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                        height: 28, fontSize: 13, whiteSpace: 'nowrap',
-                        borderColor: priceRangeActive ? '#1890ff' : (showPriceRange ? '#1677ff' : undefined),
-                        background: priceRangeActive ? '#e6f7ff' : undefined,
-                      }}
-                    >
-                      <span style={{ color: '#555' }}>出价范围:</span>
-                      <span style={{
-                        color: priceRangeActive ? '#1890ff' : '#bbb',
-                        maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      }}>
-                        {priceRangeSummary}
-                      </span>
-                    </Button>
+                    <div key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      <span style={{ fontSize: 13, color: '#333', whiteSpace: 'nowrap', fontWeight: 400 }}>出价范围</span>
+                      <button
+                        ref={priceBtnRef}
+                        onClick={handleOpenPriceRange}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          height: 28, fontSize: 13, fontWeight: 400, whiteSpace: 'nowrap',
+                          border: `1px solid ${showPriceRange ? '#1677ff' : '#e0e0e0'}`,
+                          borderRadius: 6, padding: '0 8px 0 10px', width: 110,
+                          background: '#fff', cursor: 'pointer', outline: 'none',
+                          transition: 'border-color 0.15s',
+                        }}
+                      >
+                        <span style={{
+                          flex: 1, color: priceRangeActive ? '#1677ff' : '#bbb',
+                          maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>
+                          {priceRangeSummary}
+                        </span>
+                        <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="#bbb" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      </button>
+                    </div>
                   );
                 }
                 return null;
               }
 
               const isLocked = !!channelLocked && (key === 'mainChannel' || key === 'subChannel');
+
+              // 广告创建时间：日期范围选择器，与消耗时间保持一致
+              if (DATE_RANGE_KEYS.has(key)) {
+                const sel = filterSelections[key] || [];
+                return (
+                  <div key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                    <span style={{ fontSize: 13, color: '#333', whiteSpace: 'nowrap', fontWeight: 400 }}>{cfg.label}</span>
+                    <DateRangeTrigger
+                      start={sel[0] || ''}
+                      end={sel[1] || ''}
+                      onChange={(s, e) => onFilterSelect(key, s || e ? [s, e] : [])}
+                      clearable={false}
+                    />
+                  </div>
+                );
+              }
 
               // 账号ID/名称：走专用文本输入组件
               if (key === 'accountId') {
@@ -235,20 +235,13 @@ export function FilterBar({
         <AllFiltersPopover
           activeFilters={activeFilters}
           onToggleFilter={onToggleFilter}
+          onClearAll={() => {
+            [...activeFilters].forEach(k => onToggleFilter(k));
+            setShowAllFilters(false);
+          }}
           onClose={() => setShowAllFilters(false)}
           fixedLeft={allFilterPos.left}
           fixedTop={allFilterPos.top}
-        />
-      )}
-
-      {showDatePicker && datePickerPos && (
-        <DateRangePicker
-          startDate={dateStart}
-          endDate={dateEnd}
-          onChange={onDateChange}
-          onClose={() => setShowDatePicker(false)}
-          fixedLeft={datePickerPos.left}
-          fixedTop={datePickerPos.top}
         />
       )}
 

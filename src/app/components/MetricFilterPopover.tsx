@@ -298,7 +298,7 @@ function MetricCascadeSelect({ value, onChange }: {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           width: 148, padding: '5px 8px',
           border: `1px solid ${open ? '#1890ff' : '#d9d9d9'}`,
-          borderRadius: 4, cursor: 'pointer', fontSize: 13,
+          borderRadius: 6, cursor: 'pointer', fontSize: 13,
           background: '#fff', flexShrink: 0, gap: 4,
           boxSizing: 'border-box',
         }}

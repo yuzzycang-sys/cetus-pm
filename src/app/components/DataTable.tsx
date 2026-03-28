@@ -239,8 +239,29 @@ export function DataTable({ activeDims, hasData, activeFilter, mergeView }: Prop
   const columns: ColumnsType<Row> = [...dimColumns, ...metricColumns];
 
   return (
-    <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '0 16px' }}>
+      <style>{`
+        .cetus-table .ant-table {
+          border-left: none !important;
+        }
+        .cetus-table .ant-table-container {
+          border-left: none !important;
+        }
+        .cetus-table .ant-table-thead > tr > th {
+          background: #f0f5ff !important;
+        }
+        .cetus-table .ant-table-thead > tr > th.ant-table-cell {
+          border-right: none !important;
+        }
+        .cetus-table .ant-table-thead > tr > th.ant-table-cell::before {
+          top: 50% !important;
+          height: 1.4em !important;
+          transform: translateY(-50%) !important;
+          background-color: #d0d7e3 !important;
+        }
+      `}</style>
       <Table<Row>
+        className="cetus-table"
         dataSource={displayRows}
         rowKey="id"
         columns={columns}

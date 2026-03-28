@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
-import { Modal, Button, Input, Tabs, Radio, Typography } from 'antd';
+import { Modal, Button, Radio, Typography, Input, Tabs } from 'antd';
+import { DateRangeTrigger } from './DateRangePicker';
 
 const TIME_OPTS = ['今天', '昨天', '近7天', '近30天'];
 const MAX_CHARS = 30;
@@ -10,6 +11,15 @@ interface Props {
   onConfirm: (name: string, timeOpt: string) => void;
   onClose: () => void;
 }
+
+const modalCss = `
+  .view-modal .ant-modal-title { font-size: 14px !important; font-weight: 500 !important; }
+  .view-modal .ant-tabs-tab { font-size: 12px !important; font-weight: 400 !important; padding: 5px 0 !important; color: #888 !important; }
+  .view-modal .ant-tabs-tab-active .ant-tabs-tab-btn { font-weight: 500 !important; color: #1890ff !important; }
+  .view-modal .ant-tabs-nav { margin-bottom: 8px !important; }
+  .view-modal .ant-radio-button-wrapper { font-size: 12px !important; font-weight: 400 !important; height: 26px !important; line-height: 24px !important; padding: 0 12px !important; }
+`;
+
 
 export function UpdateViewModal({ viewName, onConfirm, onClose }: Props) {
   const [name, setName] = useState(viewName);
@@ -39,31 +49,24 @@ export function UpdateViewModal({ viewName, onConfirm, onClose }: Props) {
       key: 'absolute',
       label: '绝对时间',
       children: (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Input
-            type="date"
-            value={absStart}
-            onChange={e => setAbsStart(e.target.value)}
-            style={{ width: 150 }}
-          />
-          <span style={{ color: '#999', fontSize: 12 }}>~</span>
-          <Input
-            type="date"
-            value={absEnd}
-            onChange={e => setAbsEnd(e.target.value)}
-            style={{ width: 150 }}
-          />
-        </div>
+        <DateRangeTrigger
+          start={absStart}
+          end={absEnd}
+          onChange={(s, e) => { setAbsStart(s); setAbsEnd(e); }}
+          clearable={false}
+        />
       ),
     },
   ];
 
   const footer = (
     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-      <Button onClick={onClose}>取消</Button>
+      <Button size="small" onClick={onClose} style={{ letterSpacing: 0 }}>取消</Button>
       <Button
+        size="small"
         type="primary"
         disabled={!canConfirm}
+        style={{ letterSpacing: 0 }}
         onClick={() => canConfirm && onConfirm(name, timeTab === 'relative' ? selectedTime : `${absStart}~${absEnd}`)}
       >
         确定
@@ -78,10 +81,12 @@ export function UpdateViewModal({ viewName, onConfirm, onClose }: Props) {
       title="更新当前视图"
       footer={footer}
       width={440}
+      className="view-modal"
     >
+      <style>{modalCss}</style>
       {/* View name */}
-      <div style={{ marginBottom: 18 }}>
-        <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#333', marginBottom: 6 }}>
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ display: 'block', fontSize: 12, fontWeight: 400, color: '#333', marginBottom: 6 }}>
           视图名称
         </label>
         <Input
@@ -89,7 +94,7 @@ export function UpdateViewModal({ viewName, onConfirm, onClose }: Props) {
           onChange={e => setName(e.target.value)}
           status={overLimit ? 'error' : undefined}
           suffix={
-            <span style={{ fontSize: 12, color: overLimit ? '#ff4d4f' : '#aaa' }}>
+            <span style={{ fontSize: 12, color: overLimit ? '#ff4d4f' : '#bbb' }}>
               {charCount}/{MAX_CHARS}
             </span>
           }
@@ -103,7 +108,7 @@ export function UpdateViewModal({ viewName, onConfirm, onClose }: Props) {
 
       {/* Time selection */}
       <div>
-        <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#333', marginBottom: 6 }}>
+        <label style={{ display: 'block', fontSize: 12, fontWeight: 400, color: '#333', marginBottom: 6 }}>
           时间选择
         </label>
         <Tabs

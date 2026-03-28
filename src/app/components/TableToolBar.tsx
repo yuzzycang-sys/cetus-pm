@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Button, Radio, Divider, Space } from 'antd';
+import { Button, Divider, Space, Segmented } from 'antd';
 import { Settings2, Columns3, Filter, LayoutList, LayoutGrid } from 'lucide-react';
 import { AggregateDimensionPopover } from './AggregateDimensionPopover';
 import { MetricFilterPopover, MetricFilterEditModal } from './MetricFilterPopover';
@@ -12,6 +12,7 @@ interface Props {
   onChangeGranularity: (g: 'day' | 'week' | 'month') => void;
   activeDims: string[];
   onChangeDims: (dims: string[]) => void;
+  onApplyDimsToName?: (dims: string[]) => void;
   viewMode: 'list' | 'grid';
   onChangeViewMode: (m: 'list' | 'grid') => void;
   mergeView: boolean;
@@ -25,17 +26,20 @@ interface Props {
   onDeleteFilter: (id: string) => void;
   localFilters: LocalFilters;
   onChangeLocalFilters: (next: LocalFilters) => void;
+  dimAutoUpdate: boolean;
+  onChangeDimAutoUpdate: (v: boolean) => void;
 }
 
 export function TableToolBar({
   timeGranularity, onChangeGranularity,
-  activeDims, onChangeDims,
+  activeDims, onChangeDims, onApplyDimsToName,
   viewMode, onChangeViewMode,
   mergeView, onChangeMergeView,
   onQuery, onExport,
   filterCombinations, activeFilterId,
   onSelectFilter, onSaveFilter, onDeleteFilter,
   localFilters, onChangeLocalFilters,
+  dimAutoUpdate, onChangeDimAutoUpdate,
 }: Props) {
   const [showAggDim, setShowAggDim] = useState(false);
   const [aggDimOrderMode, setAggDimOrderMode] = useState<'default' | 'custom'>('default');
@@ -93,31 +97,21 @@ export function TableToolBar({
     ? (filterCombinations.find(c => c.id === activeFilterId)?.name ?? '')
     : '';
 
-  const localFilterCount = Object.keys(localFilters).length;
+  const localFilterCount = Object.values(localFilters).filter(v => (v.values?.length ?? 0) > 0).length;
 
   return (
     <>
       <div style={{
         height: 40, display: 'flex', alignItems: 'center',
-        borderBottom: '1px solid #d9d9d9', padding: '0 16px',
+        padding: '0 16px',
         background: 'transparent', flexShrink: 0,
         justifyContent: 'space-between',
       }}>
         {/* Left */}
         <Space size={4} align="center">
           {/* Time granularity */}
-          <span style={{ fontSize: 12, color: '#595959' }}>时度</span>
-          <Radio.Group
-            size="small"
-            value={timeGranularity}
-            onChange={e => onChangeGranularity(e.target.value)}
-            optionType="button"
-            buttonStyle="solid"
-          >
-            <Radio.Button value="day">日</Radio.Button>
-            <Radio.Button value="week">周</Radio.Button>
-            <Radio.Button value="month">月</Radio.Button>
-          </Radio.Group>
+          <span style={{ fontSize: 12, color: '#8c8c8c' }}>时度</span>
+          <GranularityPicker value={timeGranularity} onChange={onChangeGranularity} />
 
           <Divider type="vertical" style={{ margin: '0 4px' }} />
 
@@ -142,6 +136,9 @@ export function TableToolBar({
                 timeGranularity={timeGranularity}
                 orderMode={aggDimOrderMode}
                 onOrderModeChange={setAggDimOrderMode}
+                onApplyDimsToName={onApplyDimsToName}
+                autoUpdate={dimAutoUpdate}
+                onAutoUpdateChange={onChangeDimAutoUpdate}
               />
             )}
           </div>
@@ -172,25 +169,13 @@ export function TableToolBar({
 
         {/* Right */}
         <Space size={8} align="center">
-          <Radio.Group
-            size="small"
-            value={mergeView ? 'merge' : 'normal'}
-            onChange={e => onChangeMergeView(e.target.value === 'merge')}
-            optionType="button"
-          >
-            <Radio.Button value="normal" title="普通视图" style={{ lineHeight: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-              <LayoutList size={14} />
-            </Radio.Button>
-            <Radio.Button value="merge" title="聚合视图" style={{ lineHeight: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-              <LayoutGrid size={14} />
-            </Radio.Button>
-          </Radio.Group>
+          <ViewModePicker value={mergeView ? 'merge' : 'normal'} onChange={v => onChangeMergeView(v === 'merge')} />
 
-          <Button type="primary" size="middle" onClick={onQuery} style={{ padding: '0 16px' }}>
+          <Button type="primary" size="small" onClick={onQuery} style={{ padding: '0 14px', fontSize: 12, height: 28 }}>
             查询
           </Button>
 
-          <Button size="middle" onClick={onExport} style={{ padding: '0 16px' }}>
+          <Button size="small" onClick={onExport} style={{ padding: '0 14px', fontSize: 12, height: 28 }}>
             导出
           </Button>
         </Space>
@@ -240,20 +225,80 @@ function ToolbarBtn({ icon, label, onClick, active }: {
 }) {
   return (
     <Button
-      type={active ? 'primary' : 'text'}
-      ghost={active}
-      size="middle"
-      icon={icon}
+      type="default"
+      size="small"
       onClick={onClick}
       style={{
         maxWidth: 220,
+        fontSize: 12,
+        height: 28,
+        padding: '0 10px',
         display: 'inline-flex',
         alignItems: 'center',
+        color: 'rgba(0,0,0,0.88)',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
       }}
     >
-      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        {label}
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ color: active ? '#1677ff' : 'inherit', display: 'inline-flex', alignItems: 'center' }}>
+          {icon}
+        </span>
+        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {label}
+        </span>
       </span>
     </Button>
   );
 }
+
+function GranularityPicker({ value, onChange }: {
+  value: 'day' | 'week' | 'month';
+  onChange: (v: 'day' | 'week' | 'month') => void;
+}) {
+  return (
+    <>
+      <style>{`
+        .gran-seg .ant-segmented-item { font-size: 12px !important; font-weight: 400 !important; color: #595959; }
+        .gran-seg .ant-segmented-item-selected { color: #1677ff !important; font-weight: 400 !important; }
+        .gran-seg .ant-segmented-item-label { font-size: 12px !important; min-height: unset; }
+      `}</style>
+      <Segmented
+        size="small"
+        value={value}
+        onChange={v => onChange(v as 'day' | 'week' | 'month')}
+        options={[
+          { label: '天', value: 'day' },
+          { label: '周', value: 'week' },
+          { label: '月', value: 'month' },
+        ]}
+        className="gran-seg"
+      />
+    </>
+  );
+}
+
+function ViewModePicker({ value, onChange }: {
+  value: 'normal' | 'merge';
+  onChange: (v: 'normal' | 'merge') => void;
+}) {
+  return (
+    <>
+      <style>{`
+        .view-seg .ant-segmented-item { font-size: 12px !important; font-weight: 400 !important; color: #595959; }
+        .view-seg .ant-segmented-item-selected { color: #1677ff !important; font-weight: 400 !important; }
+        .view-seg .ant-segmented-item-label { font-size: 12px !important; min-height: unset; display: inline-flex; align-items: center; justify-content: center; }
+      `}</style>
+      <Segmented
+        size="small"
+        value={value}
+        onChange={v => onChange(v as 'normal' | 'merge')}
+        options={[
+          { value: 'normal', title: '普通视图', icon: <LayoutList size={14} /> },
+          { value: 'merge',  title: '聚合视图', icon: <LayoutGrid size={14} /> },
+        ]}
+        className="view-seg"
+      />
+    </>
+  );
+}
+

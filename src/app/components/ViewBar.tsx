@@ -44,8 +44,8 @@ export function ViewBar({
   return (
     <>
       <div style={{
-        height: 40, display: 'flex', alignItems: 'center',
-        borderBottom: 'none', padding: '0 16px',
+        display: 'flex', alignItems: 'center',
+        borderBottom: 'none', padding: '10px 16px',
         background: 'transparent', gap: 10, flexShrink: 0, fontFamily: F,
       }}>
         {/* Select view button */}
@@ -178,6 +178,7 @@ function PinnedTag({ name, active, onClick }: { name: string; active: boolean; o
       ghost={active}
       style={{
         height: 28, fontSize: 13,
+        padding: '0 10px',
         whiteSpace: 'nowrap',
       }}
     >

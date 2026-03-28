@@ -33,7 +33,7 @@ const DIM_GROUPS: DimGroup[] = [
 
 const SELECTABLE_KEYS = DIM_GROUPS.flatMap(g => g.items.map(i => i.key));
 
-const LABEL_MAP: Record<string, string> = {
+export const LABEL_MAP: Record<string, string> = {
   [TIME_KEY]: TIME_LABEL,
   ...Object.fromEntries(DIM_GROUPS.flatMap(g => g.items.map(i => [i.key, i.label]))),
 };
@@ -51,6 +51,9 @@ interface Props {
   timeGranularity?: 'day' | 'week' | 'month';
   orderMode: OrderMode;
   onOrderModeChange: (mode: OrderMode) => void;
+  onApplyDimsToName?: (dims: string[]) => void;
+  autoUpdate: boolean;
+  onAutoUpdateChange: (v: boolean) => void;
 }
 
 function ensureTime(dims: string[]): string[] {
@@ -65,13 +68,16 @@ function sortByDefinition(dims: string[]): string[] {
 // ── Main component ────────────────────────────────────────────────────────────
 export function AggregateDimensionPopover({
   activeDims, onChangeDims, onClose, timeGranularity, orderMode, onOrderModeChange,
+  onApplyDimsToName, autoUpdate, onAutoUpdateChange,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [localDims, setLocalDims] = useState<string[]>(() => ensureTime(activeDims));
   const [draggedKey, setDraggedKey] = useState<string | null>(null);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
 
-  useEffect(() => { setLocalDims(ensureTime(activeDims)); }, [activeDims.join(',')]);
+  const applyIfAuto = (dims: string[]) => {
+    if (autoUpdate) onApplyDimsToName?.(dims);
+  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -97,12 +103,14 @@ export function AggregateDimensionPopover({
     }
     setLocalDims(next);
     onChangeDims(next);
+    applyIfAuto(next);
   };
 
   const handleClear = () => {
     const next = [TIME_KEY];
     setLocalDims(next);
     onChangeDims(next);
+    applyIfAuto(next);
   };
 
   // ── Order mode ─────────────────────────────────────────────────────────────
@@ -112,6 +120,7 @@ export function AggregateDimensionPopover({
       const sorted = sortByDefinition(localDims);
       setLocalDims(sorted);
       onChangeDims(sorted);
+      applyIfAuto(sorted);
     }
   };
 
@@ -135,6 +144,7 @@ export function AggregateDimensionPopover({
     next.splice(toIdx, 0, draggedKey);
     setLocalDims(next);
     onChangeDims(next);
+    applyIfAuto(next);
     setDraggedKey(null); setDragOverKey(null);
   };
 
@@ -143,6 +153,7 @@ export function AggregateDimensionPopover({
   return (
     <div
       ref={ref}
+      className="agg-dim-pop"
       style={{
         position: 'absolute', top: '100%', left: 0, zIndex: 1000,
         background: '#fff', borderRadius: 8,
@@ -152,22 +163,27 @@ export function AggregateDimensionPopover({
         display: 'flex', flexDirection: 'column',
       }}
     >
+      <style>{`
+        .agg-dim-pop .ant-checkbox-wrapper { font-weight: 400 !important; }
+        .agg-dim-select-popup .ant-select-item { font-size: 12px !important; }
+      `}</style>
       {/* ── Header ── */}
       <div style={{
         padding: '10px 16px', borderBottom: '1px solid #e8e8e8',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         gap: 16, flexShrink: 0,
       }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#333' }}>聚合维度</span>
+        <span style={{ fontSize: 13, fontWeight: 400, color: '#333' }}>聚合维度</span>
 
         {/* Order mode select */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, color: '#666', whiteSpace: 'nowrap' }}>维度列展示顺序</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 12, color: '#aaa', whiteSpace: 'nowrap' }}>维度列展示顺序</span>
           <Select
             size="small"
             value={orderMode}
             onChange={handleSetMode}
-            style={{ width: 90, fontSize: 12 }}
+            style={{ width: 88, fontSize: 12, height: 26 }}
+            popupClassName="agg-dim-select-popup"
             getPopupContainer={() => ref.current || document.body}
             options={[
               { value: 'default', label: '系统默认' },
@@ -274,8 +290,15 @@ export function AggregateDimensionPopover({
       {/* ── Footer ── */}
       <div style={{
         padding: '8px 16px', borderTop: '1px solid #f0f0f0',
-        display: 'flex', justifyContent: 'flex-end',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
+        <Checkbox
+          checked={autoUpdate}
+          onChange={e => onAutoUpdateChange(e.target.checked)}
+          style={{ fontSize: 12 }}
+        >
+          自动更新至名称
+        </Checkbox>
         <Button
           type="link"
           size="small"
