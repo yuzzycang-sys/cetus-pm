@@ -186,7 +186,7 @@ export function AggregateDimensionPopover({
           {/* Selectable dim groups */}
           {DIM_GROUPS.map((group, gi) => (
             <div key={group.group} style={{ marginBottom: gi < DIM_GROUPS.length - 1 ? 12 : 0 }}>
-              <div style={{ fontSize: 11, color: '#aaa', marginBottom: 8 }}>{group.group}</div>
+              <div style={{ fontSize: 12, color: '#aaa', marginBottom: 8 }}>{group.group}</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px 0' }}>
                 {group.items.map(item => {
                   const checked = localDims.includes(item.key);
@@ -212,7 +212,7 @@ export function AggregateDimensionPopover({
             width: 160, borderLeft: '1px solid #e8e8e8',
             padding: '12px 0 4px', flexShrink: 0,
           }}>
-            <div style={{ padding: '0 12px 8px', fontSize: 11, color: '#aaa' }}>
+            <div style={{ padding: '0 12px 8px', fontSize: 12, color: '#aaa' }}>
               展示顺序
             </div>
 

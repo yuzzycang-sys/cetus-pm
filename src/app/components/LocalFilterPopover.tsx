@@ -27,7 +27,7 @@ function KindBadge({ kind }: { kind: MatchMode }) {
   const isExact = kind === 'exact';
   return (
     <span style={{
-      fontSize: 10, lineHeight: '16px', padding: '0 4px', borderRadius: 3,
+      fontSize: 11, lineHeight: '16px', padding: '0 4px', borderRadius: 3,
       background: isExact ? '#f6ffed' : '#f9f0ff',
       color: isExact ? '#52c41a' : '#722ed1',
       border: `1px solid ${isExact ? '#b7eb8f' : '#d3adf7'}`,
@@ -208,7 +208,7 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
                 <span
                   onClick={() => setMode('batch')}
                   style={{
-                    fontSize: 11, color: '#1890ff', cursor: 'pointer',
+                    fontSize: 12, color: '#1890ff', cursor: 'pointer',
                     whiteSpace: 'nowrap', flexShrink: 0,
                     borderLeft: '1px solid #e8e8e8', paddingLeft: 7, marginLeft: 2,
                   }}
@@ -229,7 +229,7 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
                 <span>已选 ({selected.length})</span>
                 {customCount > 0 && (
                   <span style={{
-                    fontSize: 10, padding: '0 4px', borderRadius: 3,
+                    fontSize: 11, padding: '0 4px', borderRadius: 3,
                     background: '#f5f5f5', color: '#999', border: '1px solid #e8e8e8',
                     lineHeight: '16px',
                   }}>
@@ -368,12 +368,12 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
             <span>返回</span>
           </div>
           <div style={{ flex: 1 }} />
-          <span style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>匹配方式</span>
+          <span style={{ fontSize: 12, color: '#999', flexShrink: 0 }}>匹配方式</span>
           <ModeToggle value={matchMode} onChange={setMatchMode} />
         </div>
 
         <div style={{
-          padding: '5px 12px', fontSize: 11,
+          padding: '5px 12px', fontSize: 12,
           color: matchMode === 'fuzzy' ? '#7c4dff' : '#999',
           background: matchMode === 'fuzzy' ? '#f3f0ff' : '#fafafa',
           borderBottom: '1px solid #f0f0f0', transition: 'all 0.15s',
@@ -403,7 +403,7 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
         {matchMode === 'exact' && batchTokens.length > 0 && (
           <div style={{ padding: '7px 13px 4px', display: 'flex', flexDirection: 'column', gap: 4 }}>
             {exactMatched.length > 0 && (
-              <div style={{ fontSize: 11, color: '#52c41a', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ fontSize: 12, color: '#52c41a', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span>✓ 精确匹配 {exactMatched.length} 项：</span>
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#389e0d', maxWidth: 140 }}>
                   {exactMatched.join('、')}
@@ -411,12 +411,12 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
               </div>
             )}
             {exactUnmatched.length > 0 && (
-              <div style={{ fontSize: 11, color: '#bbb', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ fontSize: 12, color: '#bbb', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{
                   display: 'inline-flex', alignItems: 'center',
                   padding: '0 5px', borderRadius: 3,
                   background: '#f5f5f5', color: '#999', border: '1px solid #e8e8e8',
-                  fontSize: 10, lineHeight: '16px', flexShrink: 0,
+                  fontSize: 11, lineHeight: '16px', flexShrink: 0,
                 }}>
                   已忽略 {exactUnmatched.length} 项
                 </span>
@@ -426,20 +426,20 @@ function ItemPanel({ label, options, selected, onChangeSelected }: ItemPanelProp
               </div>
             )}
             {exactMatched.length === 0 && (
-              <div style={{ fontSize: 11, color: '#ff4d4f' }}>✕ 所有值均未在选项中找到，无法追加</div>
+              <div style={{ fontSize: 12, color: '#ff4d4f' }}>✕ 所有值均未在选项中找到，无法追加</div>
             )}
           </div>
         )}
 
         {matchMode === 'fuzzy' && batchTokens.length > 0 && (
           <div style={{ padding: '7px 13px 4px' }}>
-            <div style={{ fontSize: 11, color: '#7c4dff', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 12, color: '#7c4dff', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
               <span>共 {batchTokens.length} 个关键字将以</span>
               <span style={{
                 display: 'inline-flex', alignItems: 'center',
                 padding: '0 5px', borderRadius: 3,
                 background: '#f9f0ff', color: '#722ed1', border: '1px solid #d3adf7',
-                fontSize: 10, lineHeight: '16px',
+                fontSize: 11, lineHeight: '16px',
               }}>模糊</span>
               <span>自定义值追加到已选</span>
             </div>
@@ -599,7 +599,7 @@ function TextInputPanel({ entityLabel, selected, onChangeSelected, exclude, onEx
         />
 
         {/* Parse hint */}
-        <div style={{ minHeight: 20, marginTop: 4, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+        <div style={{ minHeight: 20, marginTop: 4, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
           {tokens.length > 0 ? (
             <>
               <span style={{ color: '#52c41a' }}>✓ {newTokens.length} 项可添加</span>
@@ -638,8 +638,8 @@ function TextInputPanel({ entityLabel, selected, onChangeSelected, exclude, onEx
             padding: '8px 14px 4px',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           }}>
-            <Typography.Text type="secondary" style={{ fontSize: 11 }}>已添加 {selected.length} 项</Typography.Text>
-            <Typography.Link onClick={handleClear} style={{ fontSize: 11 }}>清空</Typography.Link>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>已添加 {selected.length} 项</Typography.Text>
+            <Typography.Link onClick={handleClear} style={{ fontSize: 12 }}>清空</Typography.Link>
           </div>
 
           <div style={{ maxHeight: 150, overflowY: 'auto', padding: '0 0 4px' }}>

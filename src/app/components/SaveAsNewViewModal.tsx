@@ -97,13 +97,13 @@ export function SaveAsNewViewModal({ existingNames, onConfirm, onClose }: Props)
           placeholder="请输入视图名称"
           status={getError() ? 'error' : undefined}
           suffix={
-            <span style={{ fontSize: 11, color: overLimit ? '#ff4d4f' : '#aaa' }}>
+            <span style={{ fontSize: 12, color: overLimit ? '#ff4d4f' : '#aaa' }}>
               {charCount}/{MAX_CHARS}
             </span>
           }
         />
         {getError() && (
-          <Typography.Text type="danger" style={{ fontSize: 11, display: 'block', marginTop: 4 }}>
+          <Typography.Text type="danger" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
             {getError()}
           </Typography.Text>
         )}

@@ -89,13 +89,13 @@ export function UpdateViewModal({ viewName, onConfirm, onClose }: Props) {
           onChange={e => setName(e.target.value)}
           status={overLimit ? 'error' : undefined}
           suffix={
-            <span style={{ fontSize: 11, color: overLimit ? '#ff4d4f' : '#aaa' }}>
+            <span style={{ fontSize: 12, color: overLimit ? '#ff4d4f' : '#aaa' }}>
               {charCount}/{MAX_CHARS}
             </span>
           }
         />
         {overLimit && (
-          <Typography.Text type="danger" style={{ fontSize: 11, display: 'block', marginTop: 4 }}>
+          <Typography.Text type="danger" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
             视图名称上限 30 个字符（中文算 2 个）
           </Typography.Text>
         )}

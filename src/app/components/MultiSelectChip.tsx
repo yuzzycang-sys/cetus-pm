@@ -26,7 +26,7 @@ function CustomBadge({ kind }: { kind: CustomKind | undefined }) {
   if (!kind) return null;
   return (
     <Tag
-      style={{ marginInlineEnd: 0, marginLeft: 2, flexShrink: 0, fontSize: 10, lineHeight: '16px', padding: '0 5px' }}
+      style={{ marginInlineEnd: 0, marginLeft: 2, flexShrink: 0, fontSize: 11, lineHeight: '16px', padding: '0 5px' }}
       color={kind === 'exact' ? 'success' : 'purple'}
     >
       {kind === 'exact' ? '精确' : '模糊'}
@@ -331,7 +331,7 @@ export function MultiSelectChip({
                     <Button
                       type="link"
                       size="small"
-                      style={{ fontSize: 11, padding: 0, height: 'auto', borderLeft: '1px solid #e8e8e8', paddingLeft: 7, marginLeft: 2 }}
+                      style={{ fontSize: 12, padding: 0, height: 'auto', borderLeft: '1px solid #e8e8e8', paddingLeft: 7, marginLeft: 2 }}
                       onClick={() => setMode('batch')}
                     >
                       批量输入
@@ -358,7 +358,7 @@ export function MultiSelectChip({
                     <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                       <span>已选 ({selected.length})</span>
                       {customCount > 0 && (
-                        <Tag style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', margin: 0 }}>
+                        <Tag style={{ fontSize: 11, lineHeight: '16px', padding: '0 4px', margin: 0 }}>
                           {customCount} 自定义
                         </Tag>
                       )}
@@ -535,7 +535,7 @@ export function MultiSelectChip({
                 返回
               </Button>
               <div style={{ flex: 1 }} />
-              <span style={{ fontSize: 11, color: '#999', flexShrink: 0 }}>匹配方式</span>
+              <span style={{ fontSize: 12, color: '#999', flexShrink: 0 }}>匹配方式</span>
               <style>{`
                 .match-mode-seg .ant-segmented-item { font-weight: 400 !important; color: #8c8c8c; font-size: 11px !important; }
                 .match-mode-seg .ant-segmented-item-selected { font-weight: 400 !important; color: #595959 !important; font-size: 11px !important; }
@@ -557,7 +557,7 @@ export function MultiSelectChip({
             {/* Hint bar */}
             <div style={{
               padding: '5px 12px',
-              fontSize: 11,
+              fontSize: 12,
               color: matchMode === 'fuzzy' ? '#7c4dff' : '#999',
               background: matchMode === 'fuzzy' ? '#f3f0ff' : '#fafafa',
               borderBottom: '1px solid #f0f0f0',
@@ -588,7 +588,7 @@ export function MultiSelectChip({
             {matchMode === 'exact' && batchTokens.length > 0 && (
               <div style={{ padding: '7px 13px 4px', display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {exactMatched.length > 0 && (
-                  <div style={{ fontSize: 11, color: '#52c41a', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div style={{ fontSize: 12, color: '#52c41a', display: 'flex', alignItems: 'center', gap: 4 }}>
                     <span>✓ 精确匹配 {exactMatched.length} 项：</span>
                     <span style={{
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -599,8 +599,8 @@ export function MultiSelectChip({
                   </div>
                 )}
                 {exactUnmatched.length > 0 && (
-                  <div style={{ fontSize: 11, color: '#bbb', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Tag style={{ fontSize: 10, lineHeight: '16px', padding: '0 5px', flexShrink: 0 }}>
+                  <div style={{ fontSize: 12, color: '#bbb', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Tag style={{ fontSize: 11, lineHeight: '16px', padding: '0 5px', flexShrink: 0 }}>
                       已忽略 {exactUnmatched.length} 项
                     </Tag>
                     <span style={{
@@ -612,7 +612,7 @@ export function MultiSelectChip({
                   </div>
                 )}
                 {exactMatched.length === 0 && (
-                  <div style={{ fontSize: 11, color: '#ff4d4f' }}>
+                  <div style={{ fontSize: 12, color: '#ff4d4f' }}>
                     ✕ 所有值均未在选项中找到，无法追加
                   </div>
                 )}
@@ -622,9 +622,9 @@ export function MultiSelectChip({
             {/* Fuzzy mode: all tokens info */}
             {matchMode === 'fuzzy' && batchTokens.length > 0 && (
               <div style={{ padding: '7px 13px 4px' }}>
-                <div style={{ fontSize: 11, color: '#7c4dff', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 12, color: '#7c4dff', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                   <span>共 {batchTokens.length} 个关键字将以</span>
-                  <Tag color="purple" style={{ fontSize: 10, lineHeight: '16px', padding: '0 5px', margin: 0 }}>模糊</Tag>
+                  <Tag color="purple" style={{ fontSize: 11, lineHeight: '16px', padding: '0 5px', margin: 0 }}>模糊</Tag>
                   <span>自定义值追加到已选</span>
                 </div>
               </div>

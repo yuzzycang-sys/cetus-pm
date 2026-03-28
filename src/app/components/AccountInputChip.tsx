@@ -20,7 +20,7 @@ function KindBadge({ kind }: { kind: MatchMode }) {
   return (
     <Tag
       color={kind === 'exact' ? 'success' : 'purple'}
-      style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', margin: 0, flexShrink: 0, whiteSpace: 'nowrap' }}
+      style={{ fontSize: 11, lineHeight: '16px', padding: '0 4px', margin: 0, flexShrink: 0, whiteSpace: 'nowrap' }}
     >
       {kind === 'exact' ? '精确' : '模糊'}
     </Tag>
@@ -224,7 +224,7 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
             <div style={{
               minHeight: 20, marginTop: 4, marginBottom: 2,
               display: 'flex', alignItems: 'center', gap: 6,
-              fontSize: 11,
+              fontSize: 12,
             }}>
               {tokens.length > 0 ? (
                 <>
@@ -264,12 +264,12 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
                 padding: '8px 14px 4px',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
-                <span style={{ fontSize: 11, color: '#999' }}>已添加 {selected.length} 项</span>
+                <span style={{ fontSize: 12, color: '#999' }}>已添加 {selected.length} 项</span>
                 <Button
                   type="link"
                   size="small"
                   onClick={handleClear}
-                  style={{ fontSize: 11, padding: 0, height: 'auto' }}
+                  style={{ fontSize: 12, padding: 0, height: 'auto' }}
                 >
                   清空
                 </Button>

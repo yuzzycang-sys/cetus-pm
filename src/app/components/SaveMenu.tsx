@@ -63,7 +63,7 @@ export function SaveMenu({ selectedView, cacheLastOp, onToggleCache, onUpdateVie
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ color: selectedView ? '#333' : '#bbb' }}>更新当前视图</span>
                 {!selectedView && (
-                  <span style={{ fontSize: 11, color: '#bbb' }}>未选视图</span>
+                  <span style={{ fontSize: 12, color: '#bbb' }}>未选视图</span>
                 )}
               </div>
             ),

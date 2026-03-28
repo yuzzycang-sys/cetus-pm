@@ -168,7 +168,7 @@ function ViewRow({ view, isSelected, pinLimitReached, onSelect, onTogglePin, onS
 
       {/* Owner label */}
       {ownerLabel && (
-        <span style={{ fontSize: 11, color: '#aaa', marginRight: 6 }}>{ownerLabel}</span>
+        <span style={{ fontSize: 12, color: '#aaa', marginRight: 6 }}>{ownerLabel}</span>
       )}
 
       {/* Share button — only for 'mine' views, visible on hover or already shared */}
@@ -216,7 +216,7 @@ function ViewRow({ view, isSelected, pinLimitReached, onSelect, onTogglePin, onS
           <div style={{
             position: 'absolute', right: 0, bottom: '120%',
             background: 'rgba(0,0,0,0.75)', color: '#fff',
-            fontSize: 11, padding: '4px 8px', borderRadius: 4,
+            fontSize: 12, padding: '4px 8px', borderRadius: 4,
             whiteSpace: 'nowrap', zIndex: 10,
           }}>
             置顶数量已达上限 10
