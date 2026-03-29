@@ -52,7 +52,8 @@ type PendingShareAction = {
 // ── Per-sheet state ──────────────────────────────────────────
 interface SheetState {
   timeGranularity: 'day' | 'week' | 'month';
-  activeDims: string[];
+  activeDims: string[];    // committed dims (what DataTable shows)
+  pendingDims: string[];   // dims selected in toolbar but not yet queried
   hasData: boolean;
   filterCombinations: FilterCombination[];
   activeFilterId: string | null;
@@ -62,6 +63,7 @@ interface SheetState {
 const DEFAULT_SHEET_STATE: SheetState = {
   timeGranularity: 'day',
   activeDims: ['time', 'media', 'optimizer'],
+  pendingDims: ['time', 'media', 'optimizer'],
   hasData: true,
   filterCombinations: [],
   activeFilterId: null,
@@ -70,6 +72,7 @@ const DEFAULT_SHEET_STATE: SheetState = {
 const NEW_SHEET_STATE: SheetState = {
   timeGranularity: 'day',
   activeDims: [],
+  pendingDims: [],
   hasData: false,
   filterCombinations: [],
   activeFilterId: null,
@@ -78,10 +81,10 @@ const NEW_SHEET_STATE: SheetState = {
 const INITIAL_SHEETS = ['天-sheet1', '周-sheet2', '月-sheet3', '天-sheet4'];
 
 const INITIAL_SHEET_STATES: Record<string, SheetState> = {
-  '天-sheet1': { timeGranularity: 'day',   activeDims: ['time', 'media', 'optimizer'], hasData: true, filterCombinations: [], activeFilterId: null },
-  '周-sheet2': { timeGranularity: 'week',  activeDims: ['time', 'media'],              hasData: true, filterCombinations: [], activeFilterId: null },
-  '月-sheet3': { timeGranularity: 'month', activeDims: ['time', 'game', 'optimizer'],  hasData: true, filterCombinations: [], activeFilterId: null },
-  '天-sheet4': { timeGranularity: 'day',   activeDims: ['time'],                       hasData: true, filterCombinations: [], activeFilterId: null },
+  '天-sheet1': { timeGranularity: 'day',   activeDims: ['time', 'media', 'optimizer'], pendingDims: ['time', 'media', 'optimizer'], hasData: true, filterCombinations: [], activeFilterId: null },
+  '周-sheet2': { timeGranularity: 'week',  activeDims: ['time', 'media'],              pendingDims: ['time', 'media'],              hasData: true, filterCombinations: [], activeFilterId: null },
+  '月-sheet3': { timeGranularity: 'month', activeDims: ['time', 'game', 'optimizer'],  pendingDims: ['time', 'game', 'optimizer'],  hasData: true, filterCombinations: [], activeFilterId: null },
+  '天-sheet4': { timeGranularity: 'day',   activeDims: ['time'],                       pendingDims: ['time'],                       hasData: true, filterCombinations: [], activeFilterId: null },
 };
 
 const INITIAL_VIEWS: ViewItem[] = [
@@ -638,15 +641,16 @@ export default function App() {
               <TableToolBar
                 timeGranularity={currentSheetState.timeGranularity}
                 onChangeGranularity={handleChangeGranularity}
-                activeDims={currentSheetState.activeDims}
-                onChangeDims={dims => updateSheetState({ activeDims: dims })}
+                activeDims={currentSheetState.pendingDims}
+                onChangeDims={dims => updateSheetState({ pendingDims: dims })}
                 onApplyDimsToName={handleApplyDimsToName}
                 viewMode={viewMode}
                 onChangeViewMode={setViewMode}
                 mergeView={mergeView}
                 onChangeMergeView={setMergeView}
                 onQuery={() => {
-                  if (currentSheetState.activeDims.length > 0) updateSheetState({ hasData: true });
+                  const dims = currentSheetState.pendingDims;
+                  updateSheetState({ activeDims: dims, hasData: dims.length > 0 });
                 }}
                 onExport={() => setIsExportModalVisible(true)}
                 filterCombinations={currentSheetState.filterCombinations}

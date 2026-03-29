@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Table, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { Inbox, ChevronDown, ArrowDown, ArrowUp } from 'lucide-react';
+import { Inbox, ChevronDown, ArrowDown, ArrowUp, PanelLeft } from 'lucide-react';
 import type { FilterCombination } from './MetricFilterPopover';
 
 const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
@@ -199,7 +199,20 @@ export function DataTable({ activeDims, hasData, activeFilter, mergeView }: Prop
   const [sortColKey, setSortColKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
   const [dropdown, setDropdown] = useState<DropdownState>(null);
+  // null = default boundary (last dim col); otherwise user-chosen
+  const [freezeBoundary, setFreezeBoundary] = useState<
+    { type: 'dim'; idx: number } | { type: 'metric'; idx: number } | null
+  >(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Reset freeze to default when activeDims changes (layout shifts)
+  const prevActiveDimsRef = useRef(activeDims);
+  useEffect(() => {
+    if (prevActiveDimsRef.current !== activeDims) {
+      setFreezeBoundary(null);
+      prevActiveDimsRef.current = activeDims;
+    }
+  }, [activeDims]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -294,78 +307,102 @@ export function DataTable({ activeDims, hasData, activeFilter, mergeView }: Prop
   };
 
   // Build antd columns
-  const dimColumns: ColumnsType<Row> = DIM_COLS.map((col, i) => ({
-    title: mergeView
-      ? col.label
-      : (
-        <ColHeader
-          label={col.label}
-          colKey={col.dimKey}
-          sortColKey={sortColKey}
-          sortDir={sortDir}
-          onOpenDropdown={handleOpenDropdown}
-        />
-      ),
-    dataIndex: col.rowKey,
-    key: col.dimKey,
-    fixed: 'left' as const,
-    width: col.width,
-    align: 'center' as const,
-    onHeaderCell: () => ({ style: { textAlign: 'center' as const } }),
-    ...(mergeView
-      ? {
-          sorter: (a: Row, b: Row) =>
-            String(a[col.rowKey]).localeCompare(String(b[col.rowKey]), 'zh-CN'),
-        }
-      : {}),
-    ...(mergeView && spanInfo
-      ? {
-          onCell: (_record: Row, rowIndex?: number) => {
-            if (rowIndex === undefined) return {};
-            const si = spanInfo[rowIndex][i];
-            return { rowSpan: si.render ? si.rowspan : 0 };
-          },
-        }
-      : {}),
-    render: (val: unknown) => String(val),
-  }));
+  const dimColumns: ColumnsType<Row> = DIM_COLS.map((col, i) => {
+    const isLastDim = i === DIM_COLS.length - 1;
+    const isBoundary = freezeBoundary === null
+      ? isLastDim
+      : freezeBoundary.type === 'dim' && freezeBoundary.idx === i;
+    // Only show shadow on dim col boundary when freeze is on a dim col (or default)
+    const showDimShadow = isBoundary && (freezeBoundary === null || freezeBoundary.type === 'dim');
+    const shadowStyle = showDimShadow
+      ? { boxShadow: '6px 0 8px -4px rgba(0,0,0,0.12)', clipPath: 'inset(0 -12px 0 0)' }
+      : {};
+    return {
+      title: mergeView
+        ? col.label
+        : (
+          <ColHeader
+            label={col.label}
+            colKey={col.dimKey}
+            sortColKey={sortColKey}
+            sortDir={sortDir}
+            onOpenDropdown={handleOpenDropdown}
+          />
+        ),
+      dataIndex: col.rowKey,
+      key: col.dimKey,
+      fixed: 'left' as const,
+      width: col.width,
+      align: 'center' as const,
+      onHeaderCell: () => ({ style: { textAlign: 'center' as const, ...shadowStyle } }),
+      ...(mergeView
+        ? {
+            sorter: (a: Row, b: Row) =>
+              String(a[col.rowKey]).localeCompare(String(b[col.rowKey]), 'zh-CN'),
+          }
+        : {}),
+      ...(mergeView && spanInfo
+        ? {
+            onCell: (_record: Row, rowIndex?: number) => {
+              if (rowIndex === undefined) return {};
+              const si = spanInfo[rowIndex][i];
+              return { rowSpan: si.render ? si.rowspan : 0, style: shadowStyle };
+            },
+          }
+        : {
+            onCell: () => ({ style: shadowStyle }),
+          }),
+      render: (val: unknown) => String(val),
+    };
+  });
 
-  const metricColumns: ColumnsType<Row> = METRIC_COLS.map(col => ({
-    title: mergeView
-      ? (
-        <Tooltip title={col.tooltip} placement="top">
-          <span style={{ cursor: 'pointer' }}>{col.label}</span>
-        </Tooltip>
-      )
-      : (
-        <ColHeader
-          label={col.label}
-          tooltip={col.tooltip}
-          colKey={String(col.key)}
-          sortColKey={sortColKey}
-          sortDir={sortDir}
-          onOpenDropdown={handleOpenDropdown}
-        />
-      ),
-    dataIndex: col.key,
-    key: String(col.key),
-    width: col.width,
-    onHeaderCell: () => ({ style: { textAlign: 'center' as const } }),
-    onCell: () => ({ style: { textAlign: 'right' as const } }),
-    ...(mergeView
-      ? {
-          sorter: (a: Row, b: Row) =>
-            (a[col.key] as number) - (b[col.key] as number),
-        }
-      : {}),
-    render: (val: number) => fmt(val, col.decimals ?? 0),
-  }));
+  const metricColumns: ColumnsType<Row> = METRIC_COLS.map((col, mi) => {
+    const isFrozen = !mergeView && freezeBoundary?.type === 'metric' && mi <= freezeBoundary.idx;
+    const isBoundary = !mergeView && freezeBoundary?.type === 'metric' && mi === freezeBoundary.idx;
+    const shadowStyle = isBoundary
+      ? { boxShadow: '6px 0 8px -4px rgba(0,0,0,0.12)', clipPath: 'inset(0 -12px 0 0)' }
+      : {};
+    return {
+      title: mergeView
+        ? (
+          <Tooltip title={col.tooltip} placement="top">
+            <span style={{ cursor: 'pointer' }}>{col.label}</span>
+          </Tooltip>
+        )
+        : (
+          <ColHeader
+            label={col.label}
+            tooltip={col.tooltip}
+            colKey={String(col.key)}
+            sortColKey={sortColKey}
+            sortDir={sortDir}
+            onOpenDropdown={handleOpenDropdown}
+          />
+        ),
+      dataIndex: col.key,
+      key: String(col.key),
+      width: col.width,
+      fixed: isFrozen ? 'left' as const : undefined,
+      onHeaderCell: () => ({ style: { textAlign: 'center' as const, ...shadowStyle } }),
+      onCell: () => ({ style: { textAlign: 'right' as const, ...shadowStyle } }),
+      ...(mergeView
+        ? {
+            sorter: (a: Row, b: Row) =>
+              (a[col.key] as number) - (b[col.key] as number),
+          }
+        : {}),
+      render: (val: number) => fmt(val, col.decimals ?? 0),
+    };
+  });
 
   const columns: ColumnsType<Row> = [...dimColumns, ...metricColumns];
 
   const activeDropdownCol = dropdown
     ? (DIM_COLS.find(c => c.dimKey === dropdown.colKey) || METRIC_COLS.find(c => String(c.key) === dropdown.colKey))
     : null;
+  const activeDropdownDimIdx = dropdown ? DIM_COLS.findIndex(c => c.dimKey === dropdown.colKey) : -1;
+  const activeDropdownMetricIdx = dropdown ? METRIC_COLS.findIndex(c => String(c.key) === dropdown.colKey) : -1;
+  const isDimDropdown = activeDropdownDimIdx >= 0;
 
   return (
     <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '0 16px' }}>
@@ -475,6 +512,19 @@ export function DataTable({ activeDims, hasData, activeFilter, mergeView }: Prop
           >
             <ArrowUp size={14} color={sortColKey === dropdown.colKey && sortDir === 'asc' ? '#1677ff' : '#595959'} strokeWidth={2} />
             <span>升序排序</span>
+          </button>
+          <div style={{ height: 1, background: '#f0f0f0', margin: '4px 0' }} />
+          <button
+            onClick={() => {
+              setFreezeBoundary(isDimDropdown
+                ? { type: 'dim', idx: activeDropdownDimIdx }
+                : { type: 'metric', idx: activeDropdownMetricIdx });
+              setDropdown(null);
+            }}
+            style={menuItemStyle(false)}
+          >
+            <PanelLeft size={14} color="#595959" strokeWidth={2} />
+            <span>冻结至此列</span>
           </button>
         </div>
       )}
