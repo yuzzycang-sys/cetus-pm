@@ -545,7 +545,8 @@ export function DataTable({ activeDims, hasData, activeFilter, mergeView }: Prop
           {/* Freeze — dim cols are always frozen, show as active but no-op */}
           <button
             onClick={() => {
-              if (!isDimDropdown) setFrozenUpTo(activeDropdownIdx);
+              // Dim cols are always fixed left; clicking freeze resets any metric freeze
+              setFrozenUpTo(isDimDropdown ? -1 : activeDropdownIdx);
               setDropdown(null);
             }}
             style={menuItemStyle(false)}
