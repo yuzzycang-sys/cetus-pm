@@ -309,10 +309,16 @@ export function DataTable({ activeDims, hasData, activeFilter, mergeView }: Prop
   // Build antd columns
   const dimColumns: ColumnsType<Row> = DIM_COLS.map((col, i) => {
     const isLastDim = i === DIM_COLS.length - 1;
+    // Dim col is frozen if: default (all dims), or freeze is on metric (all dims), or freeze is on dim at idx >= i
+    const isDimFrozen = !mergeView && (
+      freezeBoundary === null ||
+      freezeBoundary.type === 'metric' ||
+      i <= freezeBoundary.idx
+    );
+    // Shadow appears on the boundary dim col
     const isBoundary = freezeBoundary === null
       ? isLastDim
       : freezeBoundary.type === 'dim' && freezeBoundary.idx === i;
-    // Only show shadow on dim col boundary when freeze is on a dim col (or default)
     const showDimShadow = isBoundary && (freezeBoundary === null || freezeBoundary.type === 'dim');
     const shadowStyle = showDimShadow
       ? { boxShadow: '6px 0 8px -4px rgba(0,0,0,0.12)', clipPath: 'inset(0 -12px 0 0)' }
@@ -331,7 +337,7 @@ export function DataTable({ activeDims, hasData, activeFilter, mergeView }: Prop
         ),
       dataIndex: col.rowKey,
       key: col.dimKey,
-      fixed: 'left' as const,
+      fixed: isDimFrozen ? 'left' as const : undefined,
       width: col.width,
       align: 'center' as const,
       onHeaderCell: () => ({ style: { textAlign: 'center' as const, ...shadowStyle } }),
