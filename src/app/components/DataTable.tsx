@@ -206,8 +206,9 @@ export function DataTable({ activeDims, hasData, activeFilter, mergeView }: Prop
   const [sortColKey, setSortColKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
   const [dropdown, setDropdown] = useState<DropdownState>(null);
-  // Index into METRIC_COLS up to which columns are frozen left (-1 = none)
-  const [frozenUpTo, setFrozenUpTo] = useState<number>(-1);
+  // null = default (last dim col); otherwise user-chosen boundary
+  type FreezeAt = { type: 'dim'; idx: number } | { type: 'metric'; idx: number } | null;
+  const [freezeAt, setFreezeAt] = useState<FreezeAt>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
@@ -306,7 +307,8 @@ export function DataTable({ activeDims, hasData, activeFilter, mergeView }: Prop
   // Build antd columns
   const dimColumns: ColumnsType<Row> = DIM_COLS.map((col, i) => {
     const isLastDim = i === DIM_COLS.length - 1;
-    const shadowStyle = isLastDim
+    const isDimFreezeHere = freezeAt === null ? isLastDim : (freezeAt.type === 'dim' && freezeAt.idx === i);
+    const shadowStyle = isDimFreezeHere && (freezeAt === null || freezeAt.type === 'dim')
       ? { boxShadow: '6px 0 8px -4px rgba(0,0,0,0.12)', clipPath: 'inset(0 -12px 0 0)' }
       : {};
     return {
@@ -349,8 +351,8 @@ export function DataTable({ activeDims, hasData, activeFilter, mergeView }: Prop
   });
 
   const metricColumns: ColumnsType<Row> = METRIC_COLS.map((col, mi) => {
-    const isFrozen = !mergeView && mi <= frozenUpTo;
-    const isLastFrozen = !mergeView && mi === frozenUpTo;
+    const isFrozen = !mergeView && freezeAt?.type === 'metric' && mi <= freezeAt.idx;
+    const isLastFrozen = !mergeView && freezeAt?.type === 'metric' && mi === freezeAt.idx;
     return {
       title: mergeView
         ? (
@@ -398,8 +400,8 @@ export function DataTable({ activeDims, hasData, activeFilter, mergeView }: Prop
 
   const activeDropdownDimCol = dropdown ? DIM_COLS.find(c => c.dimKey === dropdown.colKey) : null;
   const activeDropdownMetricCol = dropdown ? METRIC_COLS.find(c => String(c.key) === dropdown.colKey) : null;
-  const activeDropdownIdx = activeDropdownMetricCol ? METRIC_COLS.indexOf(activeDropdownMetricCol) : -1;
-  const isCurrentlyFrozen = activeDropdownIdx >= 0 && activeDropdownIdx <= frozenUpTo;
+  const activeDropdownDimIdx = activeDropdownDimCol ? DIM_COLS.indexOf(activeDropdownDimCol) : -1;
+  const activeDropdownMetricIdx = activeDropdownMetricCol ? METRIC_COLS.indexOf(activeDropdownMetricCol) : -1;
   const isDimDropdown = !!activeDropdownDimCol;
 
   return (
@@ -546,7 +548,11 @@ export function DataTable({ activeDims, hasData, activeFilter, mergeView }: Prop
           <button
             onClick={() => {
               // Dim cols are always fixed left; clicking freeze resets any metric freeze
-              setFrozenUpTo(isDimDropdown ? -1 : activeDropdownIdx);
+              if (isDimDropdown) {
+                setFreezeAt({ type: 'dim', idx: activeDropdownDimIdx });
+              } else {
+                setFreezeAt({ type: 'metric', idx: activeDropdownMetricIdx });
+              }
               setDropdown(null);
             }}
             style={menuItemStyle(false)}
