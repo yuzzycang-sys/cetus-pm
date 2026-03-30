@@ -3,6 +3,7 @@ import { Button, Input, Typography, Checkbox, Segmented } from 'antd';
 import { Info, Search, X, ChevronDown, ChevronUp, Check, ArrowLeft } from 'lucide-react';
 import { FILTER_GROUPS, FILTER_CHIP_DATA } from './filterConfig';
 import { DateRangeTrigger } from './DateRangePicker';
+import { InfoCircleOutlined } from '@ant-design/icons';
 
 const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
 
@@ -12,7 +13,41 @@ export type LocalFilters = Record<string, LocalFilterEntry>;
 type MatchMode = 'exact' | 'fuzzy';
 
 // Keys that use text-input style panel instead of option-list panel
-const TEXT_INPUT_KEYS = new Set(['accountId', 'adId']);
+const TEXT_INPUT_KEYS = new Set([
+  'accountId', 'projectId', 'adId', 'mediaCreativeId',
+  'mediaCreativeMd5', 'creativeName', 'subChannel',
+]);
+
+type SubTypeTab = { key: string; label: string; placeholder: string };
+
+const TEXT_INPUT_TABS: Record<string, SubTypeTab[]> = {
+  accountId:        [
+    { key: 'id',   label: '账户ID',     placeholder: '输入账户ID，支持多个' },
+    { key: 'name', label: '账户名称',   placeholder: '输入账户名称，支持多个' },
+  ],
+  projectId:        [
+    { key: 'id',   label: '项目ID',     placeholder: '输入项目ID，支持多个' },
+    { key: 'name', label: '项目名称',   placeholder: '输入项目名称，支持多个' },
+  ],
+  adId:             [
+    { key: 'id',   label: '广告ID',     placeholder: '输入广告ID，支持多个' },
+    { key: 'name', label: '广告名称',   placeholder: '输入广告名称，支持多个' },
+  ],
+  mediaCreativeId:  [
+    { key: 'id',   label: '媒体素材ID', placeholder: '输入媒体素材ID，支持多个' },
+    { key: 'name', label: '媒体素材名称', placeholder: '输入媒体素材名称，支持多个' },
+  ],
+  mediaCreativeMd5: [
+    { key: 'md5',  label: '媒体素材MD5', placeholder: '输入媒体素材MD5，支持多个' },
+    { key: 'name', label: '媒体素材名称', placeholder: '输入媒体素材名称，支持多个' },
+  ],
+  creativeName:     [
+    { key: 'name', label: '素材名称',   placeholder: '输入素材名称，支持多个' },
+  ],
+  subChannel:       [
+    { key: 'id',   label: '子渠道标识', placeholder: '输入子渠道标识，支持多个' },
+  ],
+};
 
 interface Props {
   localFilters: LocalFilters;
@@ -481,18 +516,93 @@ function ItemPanel({ label, options, selected, onChangeSelected, exclude, onExcl
   );
 }
 
-// ── Text-input panel (for accountId / adId) ──────────────────────────────────
+// ── Price range panel (inline, matches FilterBar's PriceRangePicker) ─────────
+
+interface PriceRangePanelProps {
+  values: string[];
+  onChange: (next: string[]) => void;
+  onClose: () => void;
+}
+
+function PriceRangePanel({ values, onChange, onClose }: PriceRangePanelProps) {
+  const [priceMin, setPriceMin] = useState(values[0] || '');
+  const [priceMax, setPriceMax] = useState(values[1] || '');
+  const [roiMin, setRoiMin]   = useState(values[2] || '');
+  const [roiMax, setRoiMax]   = useState(values[3] || '');
+
+  const handleConfirm = () => {
+    if (priceMin || priceMax || roiMin || roiMax) {
+      onChange([priceMin, priceMax, roiMin, roiMax]);
+    } else {
+      onChange([]);
+    }
+    onClose();
+  };
+
+  const handleClear = () => {
+    setPriceMin(''); setPriceMax(''); setRoiMin(''); setRoiMax('');
+    onChange([]);
+  };
+
+  return (
+    <div
+      style={{
+        margin: '4px 0 4px 24px',
+        border: '1px solid #e8e8e8', borderRadius: 6,
+        background: '#fff', padding: '16px 16px 12px',
+      }}
+      onClick={e => e.stopPropagation()}
+    >
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ fontSize: 12, color: '#333', fontWeight: 500, marginBottom: 8, display: 'block' }}>出价范围</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Input size="small" placeholder="出价下限" value={priceMin} onChange={e => setPriceMin(e.target.value)} style={{ fontSize: 12, flex: 1 }} allowClear />
+          <span style={{ fontSize: 12, color: '#999' }}>至</span>
+          <Input size="small" placeholder="出价上限" value={priceMax} onChange={e => setPriceMax(e.target.value)} style={{ fontSize: 12, flex: 1 }} allowClear />
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ fontSize: 12, color: '#333', fontWeight: 500, marginBottom: 8, display: 'block' }}>ROI范围</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Input size="small" placeholder="ROI下限" value={roiMin} onChange={e => setRoiMin(e.target.value)} style={{ fontSize: 12, flex: 1 }} allowClear />
+          <span style={{ fontSize: 12, color: '#999' }}>至</span>
+          <Input size="small" placeholder="ROI上限" value={roiMax} onChange={e => setRoiMax(e.target.value)} style={{ fontSize: 12, flex: 1 }} allowClear />
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '6px 10px', background: '#f5f5f5', borderRadius: 4, marginBottom: 6 }}>
+          <InfoCircleOutlined style={{ fontSize: 12, color: '#555', flexShrink: 0, marginTop: 1 }} />
+          <span style={{ fontSize: 11, color: '#666', lineHeight: 1.5 }}>出价上下限支持0-10000内的整数，闭区间</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '6px 10px', background: '#f5f5f5', borderRadius: 4 }}>
+          <InfoCircleOutlined style={{ fontSize: 12, color: '#555', flexShrink: 0, marginTop: 1 }} />
+          <span style={{ fontSize: 11, color: '#666', lineHeight: 1.5 }}>ROI上下限支持0-100内的整数或小数（最多3位），闭区间</span>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <Button size="small" onClick={handleClear} style={{ fontSize: 12 }}>清空</Button>
+        <Button size="small" type="primary" onClick={handleConfirm} style={{ fontSize: 12 }}>确定</Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Text-input panel (for accountId / adId etc.) ─────────────────────────────
 
 interface TextInputPanelProps {
-  entityLabel: string; // '账号' | '广告'
+  tabs: SubTypeTab[];
   selected: string[];
   onChangeSelected: (next: string[]) => void;
   exclude: boolean;
   onExcludeChange: (v: boolean) => void;
 }
 
-function TextInputPanel({ entityLabel, selected, onChangeSelected, exclude, onExcludeChange }: TextInputPanelProps) {
-  const [subType, setSubType] = useState<'id' | 'name'>('id');
+function TextInputPanel({ tabs, selected, onChangeSelected, exclude, onExcludeChange }: TextInputPanelProps) {
+  const [activeTabIdx, setActiveTabIdx] = useState(0);
+  const activeTab = tabs[activeTabIdx] ?? tabs[0];
   const [matchMode, setMatchMode] = useState<MatchMode>('exact');
   const [inputText, setInputText] = useState('');
   const [valueMeta, setValueMeta] = useState<Record<string, MatchMode>>({});
@@ -534,9 +644,9 @@ function TextInputPanel({ entityLabel, selected, onChangeSelected, exclude, onEx
     setValueMeta({});
   };
 
-  const handleSwitchSubType = (t: 'id' | 'name') => {
-    if (t === subType) return;
-    setSubType(t);
+  const handleSwitchTab = (idx: number) => {
+    if (idx === activeTabIdx) return;
+    setActiveTabIdx(idx);
     onChangeSelected([]);
     onExcludeChange(false);
     setValueMeta({});
@@ -558,21 +668,24 @@ function TextInputPanel({ entityLabel, selected, onChangeSelected, exclude, onEx
         borderBottom: '1px solid #f0f0f0', padding: '0 12px',
       }}>
         <div style={{ display: 'flex', flex: 1 }}>
-          {(['id', 'name'] as const).map(t => {
-            const lbl = t === 'id' ? `${entityLabel}ID` : `${entityLabel}名称`;
-            const active = subType === t;
+          {tabs.length > 1 ? tabs.map((tab, idx) => {
+            const active = idx === activeTabIdx;
             return (
-              <div key={t} onClick={() => handleSwitchSubType(t)} style={{
+              <div key={tab.key} onClick={() => handleSwitchTab(idx)} style={{
                 padding: '8px 10px 7px', fontSize: 13, cursor: 'pointer',
                 color: active ? '#1890ff' : '#555',
                 borderBottom: active ? '2px solid #1890ff' : '2px solid transparent',
                 fontWeight: active ? 500 : 400,
                 marginBottom: -1, userSelect: 'none', transition: 'color 0.15s',
               }}>
-                {lbl}
+                {tab.label}
               </div>
             );
-          })}
+          }) : (
+            <div style={{ padding: '8px 10px 7px', fontSize: 13, color: '#333', fontWeight: 400 }}>
+              {tabs[0].label}
+            </div>
+          )}
         </div>
         <ModeToggle value={matchMode} onChange={setMatchMode} />
       </div>
@@ -583,11 +696,7 @@ function TextInputPanel({ entityLabel, selected, onChangeSelected, exclude, onEx
           ref={textareaRef}
           value={inputText}
           onChange={e => setInputText(e.target.value)}
-          placeholder={
-            subType === 'id'
-              ? `输入${entityLabel}ID，支持多个\n每行一个，或用逗号/空格分隔`
-              : `输入${entityLabel}名称，支持多个\n每行一个，或用逗号/空格分隔`
-          }
+          placeholder={`${activeTab.placeholder}\n每行一个，或用逗号/空格分隔`}
           rows={4}
           style={{
             width: '100%', boxSizing: 'border-box',
@@ -838,8 +947,21 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
                         {item.label}
                       </span>
 
-                      {/* Selected value chips */}
-                      {active && selectedValues.length > 0 && (
+                      {/* Selected value display */}
+                      {active && selectedValues.length > 0 && item.key === 'priceRange' && (() => {
+                        const [pMin, pMax, rMin, rMax] = selectedValues;
+                        const hasPrice = pMin || pMax;
+                        const hasRoi = rMin || rMax;
+                        const priceTxt = hasPrice ? `${pMin || ''}～${pMax || ''}` : '';
+                        const roiTxt = hasRoi ? `ROI ${rMin || ''}～${rMax || ''}` : '';
+                        const summary = [priceTxt, roiTxt].filter(Boolean).join(', ');
+                        return (
+                          <span style={{ fontSize: 12, color: activeColor, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+                            {summary}
+                          </span>
+                        );
+                      })()}
+                      {active && selectedValues.length > 0 && item.key !== 'priceRange' && (
                         <div style={{ display: 'flex', gap: 4, flexWrap: 'nowrap', flex: 1, minWidth: 0, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
                           {selectedValues.slice(0, 2).map(v => (
                             <span
@@ -870,7 +992,7 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
                       )}
 
                       {/* Expand toggle */}
-                      {(chipData || isTextInput) && (
+                      {(chipData || isTextInput || item.key === 'priceRange') && (
                         <div style={{ color: '#bbb', flexShrink: 0, lineHeight: 0, marginLeft: 'auto' }}>
                           {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                         </div>
@@ -878,17 +1000,24 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
                     </div>
 
                     {/* Expanded panel */}
-                    {expanded && isTextInput && (
+                    {expanded && item.key === 'priceRange' && (
+                      <PriceRangePanel
+                        values={selectedValues}
+                        onChange={next => handleChangeItemSelected(item.key, next)}
+                        onClose={() => setExpandedKey(null)}
+                      />
+                    )}
+                    {expanded && item.key !== 'priceRange' && isTextInput && (
                       <TextInputPanel
                         key={item.key}
-                        entityLabel={item.key === 'accountId' ? '账号' : '广告'}
+                        tabs={TEXT_INPUT_TABS[item.key] ?? [{ key: 'id', label: item.label, placeholder: `输入${item.label}` }]}
                         selected={selectedValues}
                         onChangeSelected={next => handleChangeItemSelected(item.key, next)}
                         exclude={itemExclude}
                         onExcludeChange={v => handleChangeItemExclude(item.key, v)}
                       />
                     )}
-                    {expanded && !isTextInput && chipData && (
+                    {expanded && item.key !== 'priceRange' && !isTextInput && chipData && (
                       <ItemPanel
                         key={item.key}
                         label={item.label}

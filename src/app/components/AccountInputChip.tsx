@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Button, Checkbox, Input, Segmented, Tag } from 'antd';
 
-type SubType   = 'id' | 'name';
 type MatchMode = 'exact' | 'fuzzy';
+
+export type InputTab = { key: string; label: string; placeholder: string };
 
 interface Props {
   selected: string[];
@@ -11,6 +12,7 @@ interface Props {
   onExcludeChange: (exclude: boolean) => void;
   entityLabel?: string; // default: '账号'
   idLabel?: string;     // default: 'ID', pass 'MD5' for md5 fields
+  tabs?: InputTab[];    // if provided, overrides entityLabel/idLabel tab generation
 }
 
 function parseTokens(raw: string): string[] {
@@ -28,9 +30,15 @@ function KindBadge({ kind }: { kind: MatchMode }) {
   );
 }
 
-export function AccountInputChip({ selected, onChange, exclude, onExcludeChange, entityLabel = '账号', idLabel = 'ID' }: Props) {
+export function AccountInputChip({ selected, onChange, exclude, onExcludeChange, entityLabel = '账号', idLabel = 'ID', tabs: tabsProp }: Props) {
   const [open, setOpen]           = useState(false);
-  const [subType, setSubType]     = useState<SubType>('id');
+  const [activeTabIdx, setActiveTabIdx] = useState(0);
+
+  const resolvedTabs: InputTab[] = tabsProp ?? [
+    { key: 'id',   label: `${entityLabel}${idLabel}`, placeholder: `输入${entityLabel}${idLabel}，支持多个` },
+    { key: 'name', label: `${entityLabel}名称`,       placeholder: `输入${entityLabel}名称，支持多个` },
+  ];
+  const activeTab = resolvedTabs[activeTabIdx] ?? resolvedTabs[0];
   const [matchMode, setMatchMode] = useState<MatchMode>('exact');
   const [inputText, setInputText] = useState('');
   const [dropPos, setDropPos]     = useState<{ left: number; top: number } | null>(null);
@@ -97,7 +105,7 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
     setValueMeta({});
   };
 
-  const subLabel = subType === 'id' ? `${entityLabel}${idLabel}` : `${entityLabel}名称`;
+  const subLabel = activeTab.label;
   const hasSelection = selected.length > 0;
   const activeColor  = exclude ? '#fa8c16' : '#1890ff';
   const activeBg     = exclude ? '#fff7e6' : '#e6f7ff';
@@ -182,13 +190,12 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
           }}>
             {/* 子类型 tab */}
             <div style={{ display: 'flex', flex: 1 }}>
-              {(['id', 'name'] as const).map(t => {
-                const lbl = t === 'id' ? `${entityLabel}${idLabel}` : `${entityLabel}名称`;
-                const active = subType === t;
+              {resolvedTabs.length > 1 ? resolvedTabs.map((tab, idx) => {
+                const active = idx === activeTabIdx;
                 return (
-                  <div key={t} onClick={() => {
-                    if (t === subType) return;
-                    setSubType(t);
+                  <div key={tab.key} onClick={() => {
+                    if (idx === activeTabIdx) return;
+                    setActiveTabIdx(idx);
                     onChange([]);
                     onExcludeChange(false);
                     setValueMeta({});
@@ -200,10 +207,14 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
                     fontWeight: active ? 500 : 400,
                     marginBottom: -1, userSelect: 'none', transition: 'color 0.15s',
                   }}>
-                    {lbl}
+                    {tab.label}
                   </div>
                 );
-              })}
+              }) : (
+                <div style={{ padding: '8px 10px 7px', fontSize: 13, color: '#333', fontWeight: 400 }}>
+                  {resolvedTabs[0].label}
+                </div>
+              )}
             </div>
             {/* 匹配方式 */}
             <style>{`
@@ -230,10 +241,7 @@ export function AccountInputChip({ selected, onChange, exclude, onExcludeChange,
               ref={textareaRef as React.Ref<any>}
               value={inputText}
               onChange={e => setInputText(e.target.value)}
-              placeholder={
-                subType === 'id'
-                  ? `输入${entityLabel}${idLabel}，支持多个\n每行一个，或用逗号/空格分隔`
-                  : `输入${entityLabel}名称，支持多个\n每行一个，或用逗号/空格分隔`
+              placeholder={`${activeTab.placeholder}\n每行一个，或用逗号/空格分隔`
               }
               rows={5}
               style={{
