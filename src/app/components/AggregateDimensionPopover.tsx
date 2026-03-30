@@ -15,18 +15,54 @@ const DIM_GROUPS: DimGroup[] = [
   {
     group: '通用维度',
     items: [
-      { key: 'game',      label: '游戏' },
-      { key: 'os',        label: '系统' },
-      { key: 'channel',   label: '主渠道' },
-      { key: 'region',    label: '地区' },
-      { key: 'optimizer', label: '优化师' },
-      { key: 'media',     label: '媒体' },
+      { key: 'game',        label: '游戏' },
+      { key: 'os',          label: '系统' },
+      { key: 'mainChannel', label: '主渠道名称' },
+      { key: 'subChannel',  label: '子渠道标识' },
+      { key: 'bizType',     label: '业务类型' },
+      { key: 'optimizer',   label: '优化师' },
+      { key: 'dept',        label: '部门' },
     ],
   },
   {
     group: '投放维度',
     items: [
-      { key: 'adtype', label: '广告类型' },
+      { key: 'bidStrategy',   label: '竞价策略' },
+      { key: 'optGoal',       label: '优化目标' },
+      { key: 'deepOptGoal',   label: '深度转化目标' },
+      { key: 'deepOptMethod', label: '深度优化方式' },
+      { key: 'bidTool',       label: '出价工具' },
+      { key: 'deliveryMode',  label: '投放模式' },
+    ],
+  },
+  {
+    group: '广告属性',
+    items: [
+      { key: 'accountId',        label: '账户ID/名称' },
+      { key: 'projectId',        label: '项目ID/名称' },
+      { key: 'adId',             label: '广告ID/名称' },
+      { key: 'mediaCreativeId',  label: '媒体素材ID/名称' },
+    ],
+  },
+  {
+    group: '素材信息',
+    items: [
+      { key: 'mediaCreativeMd5', label: '媒体素材MD5/名称' },
+      { key: 'creativeName',     label: '素材名称' },
+    ],
+  },
+  {
+    group: '出价范围',
+    items: [
+      { key: 'bidKilo',     label: '出价(千元)' },
+      { key: 'bidHundred',  label: '出价(百元)' },
+      { key: 'bidTen',      label: '出价(十元)' },
+      { key: 'bidYuan',     label: '出价(元)' },
+      { key: 'bid',         label: '出价' },
+      { key: 'roiCoeff001', label: 'ROI系数(0.001)' },
+      { key: 'roiCoeff01',  label: 'ROI系数(0.01)' },
+      { key: 'roiCoeff1',   label: 'ROI系数(0.1)' },
+      { key: 'roiCoeff',    label: 'ROI系数' },
     ],
   },
 ];
@@ -164,7 +200,7 @@ export function AggregateDimensionPopover({
       }}
     >
       <style>{`
-        .agg-dim-pop .ant-checkbox-wrapper { font-weight: 400 !important; }
+        .agg-dim-pop .ant-checkbox-wrapper { font-weight: 400 !important; white-space: nowrap; }
         .agg-dim-select-popup .ant-select-item { font-size: 12px !important; }
       `}</style>
       {/* ── Header ── */}
@@ -197,13 +233,13 @@ export function AggregateDimensionPopover({
       <div style={{ display: 'flex', minHeight: 200 }}>
 
         {/* Left: grouped checkbox grid */}
-        <div style={{ padding: '12px 16px 4px', width: isCustom ? 380 : 420, flexShrink: 0 }}>
+        <div style={{ padding: '12px 16px 4px', width: isCustom ? 600 : 640, flexShrink: 0, maxHeight: 400, overflowY: 'auto' }}>
 
           {/* Selectable dim groups */}
           {DIM_GROUPS.map((group, gi) => (
             <div key={group.group} style={{ marginBottom: gi < DIM_GROUPS.length - 1 ? 12 : 0 }}>
               <div style={{ fontSize: 12, color: '#aaa', marginBottom: 8 }}>{group.group}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px 0' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px 0' }}>
                 {group.items.map(item => {
                   const checked = localDims.includes(item.key);
                   return (

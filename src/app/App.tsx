@@ -62,8 +62,8 @@ interface SheetState {
 
 const DEFAULT_SHEET_STATE: SheetState = {
   timeGranularity: 'day',
-  activeDims: ['time', 'media', 'optimizer'],
-  pendingDims: ['time', 'media', 'optimizer'],
+  activeDims: ['time', 'game', 'optimizer'],
+  pendingDims: ['time', 'game', 'optimizer'],
   hasData: true,
   filterCombinations: [],
   activeFilterId: null,
@@ -81,10 +81,10 @@ const NEW_SHEET_STATE: SheetState = {
 const INITIAL_SHEETS = ['天-sheet1', '周-sheet2', '月-sheet3', '天-sheet4'];
 
 const INITIAL_SHEET_STATES: Record<string, SheetState> = {
-  '天-sheet1': { timeGranularity: 'day',   activeDims: ['time', 'media', 'optimizer'], pendingDims: ['time', 'media', 'optimizer'], hasData: true, filterCombinations: [], activeFilterId: null },
-  '周-sheet2': { timeGranularity: 'week',  activeDims: ['time', 'media'],              pendingDims: ['time', 'media'],              hasData: true, filterCombinations: [], activeFilterId: null },
-  '月-sheet3': { timeGranularity: 'month', activeDims: ['time', 'game', 'optimizer'],  pendingDims: ['time', 'game', 'optimizer'],  hasData: true, filterCombinations: [], activeFilterId: null },
-  '天-sheet4': { timeGranularity: 'day',   activeDims: ['time'],                       pendingDims: ['time'],                       hasData: true, filterCombinations: [], activeFilterId: null },
+  '天-sheet1': { timeGranularity: 'day',   activeDims: ['time', 'game', 'optimizer'],    pendingDims: ['time', 'game', 'optimizer'],    hasData: true, filterCombinations: [], activeFilterId: null },
+  '周-sheet2': { timeGranularity: 'week',  activeDims: ['time', 'mainChannel'],           pendingDims: ['time', 'mainChannel'],           hasData: true, filterCombinations: [], activeFilterId: null },
+  '月-sheet3': { timeGranularity: 'month', activeDims: ['time', 'game', 'optimizer'],    pendingDims: ['time', 'game', 'optimizer'],    hasData: true, filterCombinations: [], activeFilterId: null },
+  '天-sheet4': { timeGranularity: 'day',   activeDims: ['time'],                          pendingDims: ['time'],                          hasData: true, filterCombinations: [], activeFilterId: null },
 };
 
 const INITIAL_VIEWS: ViewItem[] = [

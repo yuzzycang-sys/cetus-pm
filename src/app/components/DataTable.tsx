@@ -8,8 +8,14 @@ const F = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neu
 
 type Row = {
   id: string;
-  date: string; media: string; optimizer: string; game: string;
-  channel: string; os: string; region: string; adtype: string;
+  date: string; game: string; os: string; mainChannel: string; subChannel: string;
+  bizType: string; optimizer: string; dept: string;
+  bidStrategy: string; optGoal: string; deepOptGoal: string; deepOptMethod: string;
+  bidTool: string; deliveryMode: string;
+  accountId: string; projectId: string; adId: string;
+  mediaCreativeId: string; mediaCreativeMd5: string; creativeName: string;
+  bidKilo: string; bidHundred: string; bidTen: string; bidYuan: string; bid: string;
+  roiCoeff001: string; roiCoeff01: string; roiCoeff1: string; roiCoeff: string;
   spend: number; newDevices: number; newDeviceCost: number;
   newPaidUsers: number; newPaidCost: number;
   ltv1: number; ltv3: number; ltv7: number; ltv15: number; ltv30: number; ltv60: number;
@@ -17,15 +23,63 @@ type Row = {
 };
 
 // ── Mock data generator ────────────────────────────────────────
-const COMBOS: Omit<Row, 'id' | 'date' | 'spend' | 'newDevices' | 'newDeviceCost' | 'newPaidUsers' | 'newPaidCost' | 'ltv1' | 'ltv3' | 'ltv7' | 'ltv15' | 'ltv30' | 'ltv60' | 'roi1' | 'roi2' | 'roi3' | 'roi7' | 'roi15' | 'roi30' | 'roi60'>[] = [
-  { media: '腾讯', optimizer: '张磊', game: '鱼乐', channel: '品牌', os: 'Android', region: '华东', adtype: '图文'   },
-  { media: '腾讯', optimizer: '王芳', game: '鱼乐', channel: '品牌', os: 'iOS',     region: '华南', adtype: '视频'   },
-  { media: '字节', optimizer: '李明', game: '大咖', channel: '效果', os: 'Android', region: '华北', adtype: '信息流' },
-  { media: '字节', optimizer: '陈刚', game: '大咖', channel: '效果', os: 'iOS',     region: '西南', adtype: '开屏'   },
-  { media: '快手', optimizer: '赵云', game: '捕鱼', channel: '效果', os: 'Android', region: '华东', adtype: '视频'   },
-  { media: '快手', optimizer: '刘洋', game: '捕鱼', channel: '效果', os: 'iOS',     region: '华北', adtype: '信息流' },
-  { media: '微博', optimizer: '吴静', game: '鱼乐', channel: '品牌', os: 'iOS',     region: '华南', adtype: '图文'   },
-  { media: '微博', optimizer: '郑强', game: '大咖', channel: '品牌', os: 'Android', region: '西南', adtype: '视频'   },
+type DimFields = Pick<Row,
+  'game' | 'os' | 'mainChannel' | 'subChannel' | 'bizType' | 'optimizer' | 'dept' |
+  'bidStrategy' | 'optGoal' | 'deepOptGoal' | 'deepOptMethod' | 'bidTool' | 'deliveryMode' |
+  'accountId' | 'projectId' | 'adId' | 'mediaCreativeId' | 'mediaCreativeMd5' | 'creativeName' |
+  'bidKilo' | 'bidHundred' | 'bidTen' | 'bidYuan' | 'bid' |
+  'roiCoeff001' | 'roiCoeff01' | 'roiCoeff1' | 'roiCoeff'
+>;
+
+// bid=450  → 千(0,1000] 百(400,500] 十(440,450] 元(449,450] roi=1.258
+// bid=1380 → 千(1000,2000] 百(1300,1400] 十(1370,1380] 元(1379,1380] roi=0.856
+// bid=1200 → 千(1000,2000] 百(1100,1200] 十(1190,1200] 元(1199,1200] roi=1.532
+// bid=1500 → 千(1000,2000] 百(1400,1500] 十(1490,1500] 元(1499,1500] roi=2.105
+// bid=308  → 千(0,1000] 百(300,400] 十(300,310] 元(307,308] roi=0.975
+// bid=1588 → 千(1000,2000] 百(1500,1600] 十(1580,1590] 元(1587,1588] roi=1.342
+// bid=500  → 千(0,1000] 百(400,500] 十(490,500] 元(499,500] roi=0.628
+// bid=1888 → 千(1000,2000] 百(1800,1900] 十(1880,1890] 元(1887,1888] roi=1.763
+const COMBOS: DimFields[] = [
+  { game: '鱼乐', os: 'Android', mainChannel: '腾讯广告', subChannel: 'GDT-01', bizType: '买量', optimizer: '张磊', dept: '投放一部',
+    bidStrategy: 'oCPM', optGoal: '激活', deepOptGoal: '付费', deepOptMethod: '自动', bidTool: '智能出价', deliveryMode: '标准投放',
+    accountId: 'A10001', projectId: 'P2001', adId: 'AD30001', mediaCreativeId: 'MC40001', mediaCreativeMd5: 'a1b2c3d4', creativeName: '素材A-横版',
+    bidKilo: '(0,1000]', bidHundred: '(400,500]', bidTen: '(440,450]', bidYuan: '(449,450]', bid: '450.00',
+    roiCoeff001: '(1.257,1.258]', roiCoeff01: '(1.25,1.26]', roiCoeff1: '(1.2,1.3]', roiCoeff: '1.258' },
+  { game: '鱼乐', os: 'iOS', mainChannel: '腾讯广告', subChannel: 'GDT-02', bizType: '品牌', optimizer: '王芳', dept: '投放一部',
+    bidStrategy: 'CPC', optGoal: '点击', deepOptGoal: '-', deepOptMethod: '-', bidTool: '手动出价', deliveryMode: '加速投放',
+    accountId: 'A10002', projectId: 'P2001', adId: 'AD30002', mediaCreativeId: 'MC40002', mediaCreativeMd5: 'e5f6g7h8', creativeName: '素材B-竖版',
+    bidKilo: '(1000,2000]', bidHundred: '(1300,1400]', bidTen: '(1370,1380]', bidYuan: '(1379,1380]', bid: '1380.00',
+    roiCoeff001: '(0.855,0.856]', roiCoeff01: '(0.85,0.86]', roiCoeff1: '(0.8,0.9]', roiCoeff: '0.856' },
+  { game: '大咖', os: 'Android', mainChannel: '巨量引擎', subChannel: 'OCEAN-01', bizType: '买量', optimizer: '李明', dept: '投放二部',
+    bidStrategy: 'oCPM', optGoal: '注册', deepOptGoal: '首充', deepOptMethod: '手动', bidTool: '自动出价', deliveryMode: '标准投放',
+    accountId: 'A10003', projectId: 'P2002', adId: 'AD30003', mediaCreativeId: 'MC40003', mediaCreativeMd5: 'i9j0k1l2', creativeName: '素材C-方版',
+    bidKilo: '(1000,2000]', bidHundred: '(1100,1200]', bidTen: '(1190,1200]', bidYuan: '(1199,1200]', bid: '1200.00',
+    roiCoeff001: '(1.531,1.532]', roiCoeff01: '(1.53,1.54]', roiCoeff1: '(1.5,1.6]', roiCoeff: '1.532' },
+  { game: '大咖', os: 'iOS', mainChannel: '巨量引擎', subChannel: 'OCEAN-02', bizType: '混合', optimizer: '陈刚', dept: '投放二部',
+    bidStrategy: 'CPA', optGoal: '付费', deepOptGoal: '深度付费', deepOptMethod: '自动', bidTool: '智能出价', deliveryMode: '加速投放',
+    accountId: 'A10004', projectId: 'P2002', adId: 'AD30004', mediaCreativeId: 'MC40004', mediaCreativeMd5: 'm3n4o5p6', creativeName: '素材D-横版',
+    bidKilo: '(1000,2000]', bidHundred: '(1400,1500]', bidTen: '(1490,1500]', bidYuan: '(1499,1500]', bid: '1500.00',
+    roiCoeff001: '(2.104,2.105]', roiCoeff01: '(2.10,2.11]', roiCoeff1: '(2.1,2.2]', roiCoeff: '2.105' },
+  { game: '捕鱼', os: 'Android', mainChannel: '快手磁力', subChannel: 'KS-01', bizType: '买量', optimizer: '赵云', dept: '投放三部',
+    bidStrategy: 'oCPM', optGoal: '激活', deepOptGoal: '付费', deepOptMethod: '自动', bidTool: '手动出价', deliveryMode: '标准投放',
+    accountId: 'A10005', projectId: 'P2003', adId: 'AD30005', mediaCreativeId: 'MC40005', mediaCreativeMd5: 'q7r8s9t0', creativeName: '素材E-竖版',
+    bidKilo: '(0,1000]', bidHundred: '(300,400]', bidTen: '(300,310]', bidYuan: '(307,308]', bid: '308.00',
+    roiCoeff001: '(0.974,0.975]', roiCoeff01: '(0.97,0.98]', roiCoeff1: '(0.9,1.0]', roiCoeff: '0.975' },
+  { game: '捕鱼', os: 'iOS', mainChannel: '快手磁力', subChannel: 'KS-02', bizType: '品牌', optimizer: '刘洋', dept: '投放三部',
+    bidStrategy: 'CPM', optGoal: '展示', deepOptGoal: '-', deepOptMethod: '-', bidTool: '自动出价', deliveryMode: '标准投放',
+    accountId: 'A10006', projectId: 'P2003', adId: 'AD30006', mediaCreativeId: 'MC40006', mediaCreativeMd5: 'u1v2w3x4', creativeName: '素材F-方版',
+    bidKilo: '(1000,2000]', bidHundred: '(1500,1600]', bidTen: '(1580,1590]', bidYuan: '(1587,1588]', bid: '1588.00',
+    roiCoeff001: '(1.341,1.342]', roiCoeff01: '(1.34,1.35]', roiCoeff1: '(1.3,1.4]', roiCoeff: '1.342' },
+  { game: '鱼乐', os: 'iOS', mainChannel: '微博粉丝通', subChannel: 'WB-01', bizType: '品牌', optimizer: '吴静', dept: '品牌部',
+    bidStrategy: 'CPC', optGoal: '点击', deepOptGoal: '-', deepOptMethod: '-', bidTool: '手动出价', deliveryMode: '加速投放',
+    accountId: 'A10007', projectId: 'P2004', adId: 'AD30007', mediaCreativeId: 'MC40007', mediaCreativeMd5: 'y5z6a7b8', creativeName: '素材G-横版',
+    bidKilo: '(0,1000]', bidHundred: '(400,500]', bidTen: '(490,500]', bidYuan: '(499,500]', bid: '500.00',
+    roiCoeff001: '(0.627,0.628]', roiCoeff01: '(0.62,0.63]', roiCoeff1: '(0.6,0.7]', roiCoeff: '0.628' },
+  { game: '大咖', os: 'Android', mainChannel: '微博粉丝通', subChannel: 'WB-02', bizType: '混合', optimizer: '郑强', dept: '品牌部',
+    bidStrategy: 'oCPM', optGoal: '注册', deepOptGoal: '首充', deepOptMethod: '手动', bidTool: '智能出价', deliveryMode: '标准投放',
+    accountId: 'A10008', projectId: 'P2004', adId: 'AD30008', mediaCreativeId: 'MC40008', mediaCreativeMd5: 'c9d0e1f2', creativeName: '素材H-竖版',
+    bidKilo: '(1000,2000]', bidHundred: '(1800,1900]', bidTen: '(1880,1890]', bidYuan: '(1887,1888]', bid: '1888.00',
+    roiCoeff001: '(1.762,1.763]', roiCoeff01: '(1.76,1.77]', roiCoeff1: '(1.7,1.8]', roiCoeff: '1.763' },
 ];
 
 // Base metrics per combo (spend scale differs to make sort demos obvious)
@@ -77,14 +131,35 @@ const DATA: Row[] = (() => {
 })();
 
 const DIM_COL_MAP: Record<string, { rowKey: keyof Row; label: string; width: number }> = {
-  time:      { rowKey: 'date',      label: '时间',     width: 104 },
-  media:     { rowKey: 'media',     label: '媒体',     width: 80  },
-  optimizer: { rowKey: 'optimizer', label: '优化师',   width: 80  },
-  game:      { rowKey: 'game',      label: '游戏',     width: 80  },
-  channel:   { rowKey: 'channel',   label: '主渠道',   width: 80  },
-  os:        { rowKey: 'os',        label: '系统',     width: 70  },
-  region:    { rowKey: 'region',    label: '地区',     width: 70  },
-  adtype:    { rowKey: 'adtype',    label: '广告类型', width: 90  },
+  time:             { rowKey: 'date',             label: '时间',           width: 104 },
+  game:             { rowKey: 'game',             label: '游戏',           width: 80  },
+  os:               { rowKey: 'os',               label: '系统',           width: 70  },
+  mainChannel:      { rowKey: 'mainChannel',      label: '主渠道名称',     width: 110 },
+  subChannel:       { rowKey: 'subChannel',       label: '子渠道标识',     width: 100 },
+  bizType:          { rowKey: 'bizType',          label: '业务类型',       width: 80  },
+  optimizer:        { rowKey: 'optimizer',        label: '优化师',         width: 80  },
+  dept:             { rowKey: 'dept',             label: '部门',           width: 90  },
+  bidStrategy:      { rowKey: 'bidStrategy',      label: '竞价策略',       width: 90  },
+  optGoal:          { rowKey: 'optGoal',          label: '优化目标',       width: 90  },
+  deepOptGoal:      { rowKey: 'deepOptGoal',      label: '深度转化目标',   width: 110 },
+  deepOptMethod:    { rowKey: 'deepOptMethod',    label: '深度优化方式',   width: 110 },
+  bidTool:          { rowKey: 'bidTool',          label: '出价工具',       width: 90  },
+  deliveryMode:     { rowKey: 'deliveryMode',     label: '投放模式',       width: 90  },
+  accountId:        { rowKey: 'accountId',        label: '账户ID/名称',    width: 120 },
+  projectId:        { rowKey: 'projectId',        label: '项目ID/名称',    width: 120 },
+  adId:             { rowKey: 'adId',             label: '广告ID/名称',    width: 120 },
+  mediaCreativeId:  { rowKey: 'mediaCreativeId',  label: '媒体素材ID/名称', width: 140 },
+  mediaCreativeMd5: { rowKey: 'mediaCreativeMd5', label: '媒体素材MD5/名称', width: 150 },
+  creativeName:     { rowKey: 'creativeName',     label: '素材名称',       width: 100 },
+  bidKilo:          { rowKey: 'bidKilo',          label: '出价(千元)',     width: 100 },
+  bidHundred:       { rowKey: 'bidHundred',       label: '出价(百元)',     width: 100 },
+  bidTen:           { rowKey: 'bidTen',           label: '出价(十元)',     width: 100 },
+  bidYuan:          { rowKey: 'bidYuan',          label: '出价(元)',       width: 90  },
+  bid:              { rowKey: 'bid',              label: '出价',           width: 80  },
+  roiCoeff001:      { rowKey: 'roiCoeff001',      label: 'ROI系数(0.001)', width: 130 },
+  roiCoeff01:       { rowKey: 'roiCoeff01',       label: 'ROI系数(0.01)',  width: 120 },
+  roiCoeff1:        { rowKey: 'roiCoeff1',        label: 'ROI系数(0.1)',   width: 120 },
+  roiCoeff:         { rowKey: 'roiCoeff',         label: 'ROI系数',        width: 90  },
 };
 
 type MetricCol = { key: keyof Row; label: string; width: number; tooltip: string; decimals?: number };
@@ -174,8 +249,14 @@ function aggregateRows(
     result.push({
       id: `agg_${idx++}`,
       date: activeDimKeys.includes('time') ? getPeriodKey(rep.date, gran) : rep.date,
-      media: rep.media, optimizer: rep.optimizer, game: rep.game,
-      channel: rep.channel, os: rep.os, region: rep.region, adtype: rep.adtype,
+      game: rep.game, os: rep.os, mainChannel: rep.mainChannel, subChannel: rep.subChannel,
+      bizType: rep.bizType, optimizer: rep.optimizer, dept: rep.dept,
+      bidStrategy: rep.bidStrategy, optGoal: rep.optGoal, deepOptGoal: rep.deepOptGoal,
+      deepOptMethod: rep.deepOptMethod, bidTool: rep.bidTool, deliveryMode: rep.deliveryMode,
+      accountId: rep.accountId, projectId: rep.projectId, adId: rep.adId,
+      mediaCreativeId: rep.mediaCreativeId, mediaCreativeMd5: rep.mediaCreativeMd5, creativeName: rep.creativeName,
+      bidKilo: rep.bidKilo, bidHundred: rep.bidHundred, bidTen: rep.bidTen, bidYuan: rep.bidYuan, bid: rep.bid,
+      roiCoeff001: rep.roiCoeff001, roiCoeff01: rep.roiCoeff01, roiCoeff1: rep.roiCoeff1, roiCoeff: rep.roiCoeff,
       spend:        sumSpend,
       newDevices:   sumNewDevices,
       newDeviceCost: sumNewDevices > 0 ? sumSpend / sumNewDevices : 0,
