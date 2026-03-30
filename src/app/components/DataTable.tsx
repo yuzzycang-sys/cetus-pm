@@ -354,29 +354,31 @@ export function DataTable({ activeDims, hasData, activeFilter, mergeView, timeGr
   // Sort rows
   const displayRows = mergeView
     ? (() => {
-        // Only sort dims that have an explicit user rule; skip dims with no rule
         type CmpFn = (a: Row, b: Row) => number;
-        const cmpFns: (CmpFn | null)[] = DIM_COLS.map(col => {
+        // For each dim col: user rule if set, else implicit grouping sort (self asc)
+        const cmpFns: CmpFn[] = DIM_COLS.map(col => {
           const rule = dimSortRules[col.dimKey];
-          if (!rule) return null;
-          const sign = rule.dir === 'asc' ? 1 : -1;
-          if (rule.basis === 'self') {
+          if (rule) {
+            const sign = rule.dir === 'asc' ? 1 : -1;
+            if (rule.basis === 'self') {
+              return (a: Row, b: Row) =>
+                sign * String(a[col.rowKey]).localeCompare(String(b[col.rowKey]), 'zh-CN');
+            }
+            // Metric basis: aggregate total per dim value, then compare
+            const totals = new Map<string, number>();
+            for (const row of rows) {
+              const k = String(row[col.rowKey]);
+              totals.set(k, (totals.get(k) ?? 0) + (row[rule.basis as keyof Row] as number));
+            }
             return (a: Row, b: Row) =>
-              sign * String(a[col.rowKey]).localeCompare(String(b[col.rowKey]), 'zh-CN');
+              sign * ((totals.get(String(a[col.rowKey])) ?? 0) - (totals.get(String(b[col.rowKey])) ?? 0));
           }
-          // Metric basis: aggregate total per dim value, then compare
-          const totals = new Map<string, number>();
-          for (const row of rows) {
-            const k = String(row[col.rowKey]);
-            totals.set(k, (totals.get(k) ?? 0) + (row[rule.basis as keyof Row] as number));
-          }
+          // No user rule: implicit grouping sort so identical values stay consecutive
           return (a: Row, b: Row) =>
-            sign * ((totals.get(String(a[col.rowKey])) ?? 0) - (totals.get(String(b[col.rowKey])) ?? 0));
+            String(a[col.rowKey]).localeCompare(String(b[col.rowKey]), 'zh-CN');
         });
-        if (cmpFns.every(f => f === null)) return rows;
         return [...rows].sort((a, b) => {
           for (const fn of cmpFns) {
-            if (!fn) continue;
             const c = fn(a, b);
             if (c !== 0) return c;
           }
