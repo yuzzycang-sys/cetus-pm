@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Button, Radio, Typography, Input, Tabs } from 'antd';
+import { Modal, Button, Radio, Typography, Input, Tabs, Popconfirm } from 'antd';
 import { Overlay } from './UpdateViewModal';
 import { DateRangeTrigger } from './DateRangePicker';
 
@@ -10,6 +10,7 @@ interface Props {
   existingNames: string[];
   onConfirm: (name: string, timeOpt: string) => void;
   onClose: () => void;
+  hasConflict?: boolean;
 }
 
 const modalCss = `
@@ -20,7 +21,7 @@ const modalCss = `
   .view-modal .ant-radio-button-wrapper { font-size: 12px !important; font-weight: 400 !important; height: 26px !important; line-height: 24px !important; padding: 0 12px !important; }
 `;
 
-export function SaveAsNewViewModal({ existingNames, onConfirm, onClose }: Props) {
+export function SaveAsNewViewModal({ existingNames, onConfirm, onClose, hasConflict }: Props) {
   const [name, setName] = useState('');
   const [timeTab, setTimeTab] = useState<'relative' | 'absolute'>('relative');
   const [selectedTime, setSelectedTime] = useState('今天');
@@ -65,18 +66,31 @@ export function SaveAsNewViewModal({ existingNames, onConfirm, onClose }: Props)
     },
   ];
 
+  const timeOpt = timeTab === 'relative' ? selectedTime : `${absStart}~${absEnd}`;
+  const handleConfirm = () => canConfirm && onConfirm(name.trim(), timeOpt);
+
+  const confirmBtn = hasConflict ? (
+    <Popconfirm
+      title="当前视图存在无权限内容，确认另存为新视图？"
+      onConfirm={handleConfirm}
+      okText="确定"
+      cancelText="取消"
+      placement="topRight"
+    >
+      <Button size="small" type="primary" disabled={!canConfirm} style={{ letterSpacing: 0 }}>
+        确定
+      </Button>
+    </Popconfirm>
+  ) : (
+    <Button size="small" type="primary" disabled={!canConfirm} style={{ letterSpacing: 0 }} onClick={handleConfirm}>
+      确定
+    </Button>
+  );
+
   const footer = (
     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
       <Button size="small" onClick={onClose} style={{ letterSpacing: 0 }}>取消</Button>
-      <Button
-        size="small"
-        type="primary"
-        disabled={!canConfirm}
-        style={{ letterSpacing: 0 }}
-        onClick={() => canConfirm && onConfirm(name.trim(), timeTab === 'relative' ? selectedTime : `${absStart}~${absEnd}`)}
-      >
-        确定
-      </Button>
+      {confirmBtn}
     </div>
   );
 

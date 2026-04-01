@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ConfigProvider } from 'antd';
+import { ConfigProvider, Button } from 'antd';
 import { ExportModal } from './components/ExportModal';
 import { Toaster, toast } from 'sonner';
 import { Lock, Link2, ArrowLeft, ShieldX } from 'lucide-react';
@@ -461,9 +461,6 @@ export default function App() {
   const handleTogglePin = (id: string) =>
     setViews(prev => prev.map(v => v.id === id ? { ...v, pinned: !v.pinned } : v));
 
-  // ── Conflict G: save-as-new with permission conflicts ──
-  const [pendingSaveName, setPendingSaveName] = useState<string | null>(null);
-
   const doSaveNewView = (name: string) => {
     const tagIds = quickTags.filter(t => t.active).map(t => t.id);
     setViews(prev => [...prev, {
@@ -473,14 +470,9 @@ export default function App() {
     setSelectedView(name);
     setDisabledFilterValues({});
     setHasConflict(false);
-    setPendingSaveName(null);
   };
 
   const handleSaveNew = (name: string) => {
-    if (hasConflict) {
-      setPendingSaveName(name);
-      return;
-    }
     doSaveNewView(name);
   };
 
@@ -772,6 +764,7 @@ export default function App() {
               onSelectView={handleSelectView}
               onTogglePin={handleTogglePin}
               onSaveNew={handleSaveNew}
+              hasConflict={hasConflict}
               pinnedViews={pinnedViews}
               activePinnedTag={activePinnedTag}
               onClickPinnedTag={handleClickPinnedTag}
@@ -1032,39 +1025,6 @@ export default function App() {
         />
       )}
 
-      {/* ── Conflict G: Save-as-new confirmation ── */}
-      {pendingSaveName && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 2000,
-          background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <div style={{
-            background: '#fff', borderRadius: 12, padding: '28px 32px', width: 420,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.18)', fontFamily: F,
-          }}>
-            <div style={{ fontSize: 16, fontWeight: 600, color: '#141414', marginBottom: 12 }}>确认保存</div>
-            <div style={{ fontSize: 13, color: '#595959', lineHeight: 1.7, marginBottom: 20 }}>
-              当前视图存在无权限内容，另存为新视图时将仅保存您有权限的配置内容：
-              {Object.keys(disabledFilterValues).length > 0 && (
-                <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 6, background: '#fff2f0', border: '1px solid #ffa39e', fontSize: 12 }}>
-                  <span style={{ color: '#ff4d4f', fontWeight: 500 }}>无权限筛选值将被移除</span>
-                  <span style={{ color: '#8c8c8c' }}>（{Object.values(disabledFilterValues).flat().join('、')}）</span>
-                </div>
-              )}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button
-                onClick={() => setPendingSaveName(null)}
-                style={{ padding: '6px 20px', borderRadius: 6, border: '1px solid #d9d9d9', background: '#fff', cursor: 'pointer', fontSize: 13 }}
-              >取消</button>
-              <button
-                onClick={() => doSaveNewView(pendingSaveName)}
-                style={{ padding: '6px 20px', borderRadius: 6, border: 'none', background: '#1890ff', color: '#fff', cursor: 'pointer', fontSize: 13 }}
-              >确定保存</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
     </ConfigProvider>
   );

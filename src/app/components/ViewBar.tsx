@@ -16,6 +16,7 @@ interface Props {
   onSelectView: (name: string) => void;
   onTogglePin: (id: string) => void;
   onSaveNew: (name: string) => void;
+  hasConflict?: boolean;
   pinnedViews: string[];
   activePinnedTag: string | null;
   onClickPinnedTag: (name: string) => void;
@@ -23,7 +24,7 @@ interface Props {
 }
 
 export function ViewBar({
-  views, selectedView, onSelectView, onTogglePin, onSaveNew,
+  views, selectedView, onSelectView, onTogglePin, onSaveNew, hasConflict,
   pinnedViews, activePinnedTag, onClickPinnedTag, onShareView,
 }: Props) {
   const [showSelector, setShowSelector] = useState(false);
@@ -146,6 +147,7 @@ export function ViewBar({
       {showSaveAsModal && (
         <SaveAsNewViewModal
           existingNames={existingNames}
+          hasConflict={hasConflict}
           onConfirm={(name, time) => {
             onSaveNew(name);
             setShowSaveAsModal(false);
