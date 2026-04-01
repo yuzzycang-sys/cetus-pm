@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ConfigProvider } from 'antd';
 import { ExportModal } from './components/ExportModal';
 import { Toaster, toast } from 'sonner';
-import { Lock } from 'lucide-react';
+import { Lock, Link2, ArrowLeft, ShieldX } from 'lucide-react';
 import { TopNav } from './components/TopNav';
 import { Sidebar } from './components/Sidebar';
 import { ViewBar } from './components/ViewBar';
@@ -40,7 +40,21 @@ function canUserAccessTag(userName: string, tag: QuickTag): boolean {
 }
 
 type TagInfo = { id: string; label: string; owner: string; vis: string };
-type PageStatus = { type: 'OK' } | { type: 'NO_PERMISSION'; missingTagsInfo: TagInfo[] };
+type PageStatus =
+  | { type: 'OK' }
+  | { type: 'NO_PERMISSION'; missingTagsInfo: TagInfo[] }
+  | { type: 'VIEW_NO_PERMISSION'; viewName: string; owner: string; shareMode: string };
+
+function canUserAccessView(userName: string, view: ViewItem): boolean {
+  if (view.type === 'public') return true;
+  if (view.owner === userName) return true;
+  if (view.shareMode === 'public') return true;
+  if (view.shareMode === 'specific') {
+    const sharedNames = (view.sharedWith ?? []).map(uid => SHARE_USER_NAMES[uid] ?? uid);
+    if (sharedNames.includes(userName)) return true;
+  }
+  return false;
+}
 
 type PendingShareAction = {
   viewId: string;
@@ -103,6 +117,12 @@ const INITIAL_VIEWS: ViewItem[] = [
   { id: '9', name: '渠道大盘',           type: 'public', pinned: false },
   // View 10: shared to 张三 by 赵云, but tags t51(private/赵云) and t52(partial, 张三 not in authUsers) are inaccessible
   { id: '10', name: '投放核心数据总览',  type: 'shared', owner: '赵云', pinned: false, tag_ids: ['t51', 't52'] },
+];
+
+// Views that exist in the system but are NOT in 张三's view list — only reachable via shared links
+const EXTERNAL_VIEWS: ViewItem[] = [
+  { id: 'ext1', name: '赵云的秘密投放方案', type: 'shared', owner: '赵云', pinned: false, shareMode: 'private' },
+  { id: 'ext2', name: '内部ROI优化策略',   type: 'shared', owner: '王五', pinned: false, shareMode: 'specific', sharedWith: ['u5', 'u6'] },
 ];
 
 const INITIAL_TAGS: QuickTag[] = [
@@ -233,7 +253,72 @@ function TagPermAlignDialog({
   );
 }
 
-// ── Scene 3: NoPermissionView ──────────────────────────────
+// ── View-level no permission (shared link) ────────────────
+function ViewNoPermissionView({ viewName, owner, shareMode, onBack }: {
+  viewName: string; owner: string; shareMode: string; onBack: () => void;
+}) {
+  return (
+    <div style={{
+      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexDirection: 'column', gap: 20, padding: '60px 20px', fontFamily: F,
+    }}>
+      <div style={{
+        width: 72, height: 72, borderRadius: '50%',
+        background: 'linear-gradient(135deg, #fff1f0, #fff0ee)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: '0 4px 16px rgba(255, 77, 79, 0.12)',
+      }}>
+        <ShieldX size={34} color="#ff4d4f" />
+      </div>
+
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 18, fontWeight: 600, color: '#141414', marginBottom: 8 }}>
+          无权访问此视图
+        </div>
+        <div style={{ fontSize: 13, color: '#8c8c8c', maxWidth: 400, lineHeight: 1.7 }}>
+          您尝试通过分享链接打开的视图暂无访问权限。请联系视图所有者为您开放权限。
+        </div>
+      </div>
+
+      <div style={{
+        width: '100%', maxWidth: 380, borderRadius: 8,
+        border: '1px solid #f0f0f0', background: '#fafafa', padding: '16px 20px',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+          <span style={{ fontSize: 12, color: '#8c8c8c' }}>视图名称</span>
+          <span style={{ fontSize: 13, fontWeight: 500, color: '#141414' }}>{viewName}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+          <span style={{ fontSize: 12, color: '#8c8c8c' }}>所有者</span>
+          <span style={{ fontSize: 13, color: '#141414' }}>{owner}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 12, color: '#8c8c8c' }}>分享范围</span>
+          <span style={{ fontSize: 13, color: '#ff4d4f', fontWeight: 500 }}>
+            {shareMode === 'private' ? '仅创建者可见' : '指定人员'}
+          </span>
+        </div>
+      </div>
+
+      <button
+        onClick={onBack}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '8px 24px', borderRadius: 6, border: '1px solid #d9d9d9',
+          background: '#fff', cursor: 'pointer', fontSize: 13, color: '#595959',
+          transition: 'all .2s',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = '#1890ff'; e.currentTarget.style.color = '#1890ff'; }}
+        onMouseLeave={e => { e.currentTarget.style.borderColor = '#d9d9d9'; e.currentTarget.style.color = '#595959'; }}
+      >
+        <ArrowLeft size={14} />
+        返回
+      </button>
+    </div>
+  );
+}
+
+// ── Scene 3: NoPermissionView (tag-level) ─────────────────
 function NoPermissionView({ missingTagsInfo }: { missingTagsInfo: TagInfo[] }) {
   return (
     <div style={{
@@ -305,6 +390,9 @@ export default function App() {
   const [pageStatus, setPageStatus] = useState<PageStatus>({ type: 'OK' });
   const [pendingShareAction, setPendingShareAction] = useState<PendingShareAction | null>(null);
 
+  // ── Shared link simulation ────────────────────────────────
+  const [showShareLinkPanel, setShowShareLinkPanel] = useState(false);
+
   const currentSheetState = sheetStates[activeSheet] || DEFAULT_SHEET_STATE;
 
   const updateSheetState = (patch: Partial<SheetState>) => {
@@ -352,6 +440,28 @@ export default function App() {
       tag_ids: tagIds.length > 0 ? tagIds : undefined,
     }]);
     setSelectedView(name);
+  };
+
+  // ── Shared link: attempt to open external view ──────────
+  const handleOpenSharedLink = (extView: ViewItem) => {
+    setShowShareLinkPanel(false);
+    if (!canUserAccessView(CURRENT_USER, extView)) {
+      setPageStatus({
+        type: 'VIEW_NO_PERMISSION',
+        viewName: extView.name,
+        owner: extView.owner ?? '未知',
+        shareMode: extView.shareMode ?? 'private',
+      });
+      setSelectedView(null);
+      setActivePinnedTag(null);
+      return;
+    }
+    setPageStatus({ type: 'OK' });
+    handleSelectView(extView.name);
+  };
+
+  const handleBackFromNoPermission = () => {
+    setPageStatus({ type: 'OK' });
   };
 
   // ── Scene 3: Load view → check tag permissions ────────────
@@ -584,6 +694,21 @@ export default function App() {
           {/* ── 内容区：有内边距 ── */}
           <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: 12, gap: 12 }}>
 
+            {/* ── VIEW_NO_PERMISSION: full content area takeover ── */}
+            {pageStatus.type === 'VIEW_NO_PERMISSION' ? (
+              <div style={{
+                background: '#fff', borderRadius: 8, flex: 1,
+                display: 'flex', flexDirection: 'column',
+              }}>
+                <ViewNoPermissionView
+                  viewName={pageStatus.viewName}
+                  owner={pageStatus.owner}
+                  shareMode={pageStatus.shareMode}
+                  onBack={handleBackFromNoPermission}
+                />
+              </div>
+            ) : (
+            <>
             {/* ── 卡片②：筛选区（筛选栏 + 快捷标签） ── */}
             <div style={{
               background: '#fff', borderRadius: 8,
@@ -660,7 +785,6 @@ export default function App() {
                   const prev = currentSheetState.pendingDims;
                   const isReorder = dims.length === prev.length &&
                     [...dims].sort().join() === [...prev].sort().join();
-                  // Reorder-only: immediately reflect in table; add/remove: pending only
                   updateSheetState(isReorder
                     ? { pendingDims: dims, activeDims: dims }
                     : { pendingDims: dims });
@@ -686,7 +810,7 @@ export default function App() {
                 onChangeDimAutoUpdate={v => updateSheetState({ dimAutoUpdate: v })}
               />
 
-              {/* ── Scene 3: NO_PERMISSION empty state ── */}
+              {/* ── Tag-level NO_PERMISSION empty state ── */}
               {pageStatus.type === 'NO_PERMISSION' ? (
                 <NoPermissionView missingTagsInfo={pageStatus.missingTagsInfo} />
               ) : (
@@ -713,8 +837,73 @@ export default function App() {
                 </>
               )}
             </div>
+            </>
+            )}
           </div>
         </div>
+      </div>
+
+      {/* ── Floating shared link simulator ── */}
+      <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000 }}>
+        <button
+          onClick={() => setShowShareLinkPanel(p => !p)}
+          style={{
+            width: 48, height: 48, borderRadius: '50%', border: 'none',
+            background: 'linear-gradient(135deg, #1890ff, #096dd9)', color: '#fff',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 4px 16px rgba(24, 144, 255, 0.4)',
+            transition: 'transform .2s, box-shadow .2s',
+          }}
+          title="模拟分享链接"
+          onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.1)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(24, 144, 255, 0.5)'; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(24, 144, 255, 0.4)'; }}
+        >
+          <Link2 size={22} />
+        </button>
+
+        {showShareLinkPanel && (
+          <div style={{
+            position: 'absolute', bottom: 60, right: 0, width: 320,
+            background: '#fff', borderRadius: 10, padding: 0, overflow: 'hidden',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.15)', border: '1px solid #f0f0f0',
+          }}>
+            <div style={{
+              padding: '14px 16px', background: 'linear-gradient(135deg, #f6f8fa, #eef1f5)',
+              borderBottom: '1px solid #f0f0f0',
+            }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#141414', marginBottom: 4 }}>模拟分享链接</div>
+              <div style={{ fontSize: 12, color: '#8c8c8c' }}>点击下方链接模拟"通过他人分享的链接打开视图"</div>
+            </div>
+            <div style={{ padding: '8px 0' }}>
+              {EXTERNAL_VIEWS.map(ev => (
+                <div
+                  key={ev.id}
+                  onClick={() => handleOpenSharedLink(ev)}
+                  style={{
+                    padding: '12px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+                    transition: 'background .15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#f5f7fa'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 6, flexShrink: 0,
+                    background: '#fff2f0', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Lock size={14} color="#ff4d4f" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: '#141414', marginBottom: 2 }}>{ev.name}</div>
+                    <div style={{ fontSize: 11, color: '#8c8c8c' }}>
+                      {ev.owner} · {ev.shareMode === 'private' ? '私有' : '指定人员'}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 11, color: '#1890ff', flexShrink: 0 }}>打开→</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Quick tag modal (with views for Scene 2 & 4) */}
