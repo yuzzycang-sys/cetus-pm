@@ -13,6 +13,9 @@ export type ViewItem = {
   shareMode?: 'private' | 'specific' | 'public';
   sharedWith?: string[];
   tag_ids?: string[];
+  snapshot?: {
+    filterSelections?: Record<string, string[]>;
+  };
 };
 
 type Tab = 'all' | 'mine' | 'pinned' | 'shared';

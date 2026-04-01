@@ -28,6 +28,7 @@ interface Props {
   onChangeLocalFilters: (next: LocalFilters) => void;
   dimAutoUpdate: boolean;
   onChangeDimAutoUpdate: (v: boolean) => void;
+  queryDisabled?: boolean;
 }
 
 export function TableToolBar({
@@ -40,6 +41,7 @@ export function TableToolBar({
   onSelectFilter, onSaveFilter, onDeleteFilter,
   localFilters, onChangeLocalFilters,
   dimAutoUpdate, onChangeDimAutoUpdate,
+  queryDisabled,
 }: Props) {
   const [showAggDim, setShowAggDim] = useState(false);
   const [aggDimOrderMode, setAggDimOrderMode] = useState<'default' | 'custom'>('default');
@@ -55,6 +57,8 @@ export function TableToolBar({
 
   // undefined = modal closed; null = creating new; FilterCombination = editing existing
   const [editingCombo, setEditingCombo] = useState<FilterCombination | null | undefined>(undefined);
+  // Temporary filter applied without saving as a template
+  const [tempFilter, setTempFilter] = useState<FilterCombination | null>(null);
 
   const handleOpenFilterPop = () => {
     if (showFilterPop) { setShowFilterPop(false); return; }
@@ -89,13 +93,21 @@ export function TableToolBar({
 
   const handleSaveCombo = (combo: FilterCombination) => {
     onSaveFilter(combo);
+    onSelectFilter(combo.id);
+    setTempFilter(null);
     setEditingCombo(undefined);
   };
 
-  const isFilterActive = activeFilterId !== null;
-  const activeComboName = isFilterActive
+  const handleApplyTemp = (combo: FilterCombination) => {
+    setTempFilter(combo);
+    onSelectFilter(null);
+    setEditingCombo(undefined);
+  };
+
+  const isFilterActive = activeFilterId !== null || tempFilter !== null;
+  const activeComboName = activeFilterId
     ? (filterCombinations.find(c => c.id === activeFilterId)?.name ?? '')
-    : '';
+    : tempFilter ? '自定义' : '';
 
   const localFilterCount = Object.values(localFilters).filter(v => (v.values?.length ?? 0) > 0).length;
 
@@ -171,8 +183,8 @@ export function TableToolBar({
         <Space size={8} align="center">
           <ViewModePicker value={mergeView ? 'merge' : 'normal'} onChange={v => onChangeMergeView(v === 'merge')} />
 
-          <Button type="primary" size="small" onClick={onQuery} style={{ padding: '0 14px', fontSize: 12, height: 28 }}>
-            查询
+          <Button type="primary" size="small" onClick={onQuery} disabled={queryDisabled} style={{ padding: '0 14px', fontSize: 12, height: 28 }}>
+            查 询
           </Button>
 
           <Button size="small" onClick={onExport} style={{ padding: '0 14px', fontSize: 12, height: 28 }}>
@@ -186,8 +198,9 @@ export function TableToolBar({
         <MetricFilterPopover
           combinations={filterCombinations}
           activeId={activeFilterId}
+          hasTempFilter={!!tempFilter}
           anchorRect={filterAnchorRect}
-          onSelect={id => { onSelectFilter(id); setShowFilterPop(false); }}
+          onSelect={id => { onSelectFilter(id); setTempFilter(null); setShowFilterPop(false); }}
           onEdit={handleEdit}
           onDelete={handleDelete}
           onNew={handleNew}
@@ -200,6 +213,7 @@ export function TableToolBar({
         <MetricFilterEditModal
           initial={editingCombo}
           onSave={handleSaveCombo}
+          onApply={handleApplyTemp}
           onClose={() => setEditingCombo(undefined)}
         />
       )}

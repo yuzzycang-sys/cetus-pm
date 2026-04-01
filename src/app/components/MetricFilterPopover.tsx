@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { ChevronRight } from 'lucide-react';
-import { Button, Input, InputNumber, Select, Modal } from 'antd';
+import { Button, Input, InputNumber, Select, Modal, Checkbox } from 'antd';
 import {
   PlusOutlined,
   EditOutlined,
@@ -102,6 +102,7 @@ function makeGroup(): FilterGroup {
 interface PopoverProps {
   combinations: FilterCombination[];
   activeId: string | null;
+  hasTempFilter?: boolean;
   anchorRect: DOMRect;
   onSelect: (id: string | null) => void;
   onEdit:   (combo: FilterCombination) => void;
@@ -111,7 +112,7 @@ interface PopoverProps {
 }
 
 export function MetricFilterPopover({
-  combinations, activeId, anchorRect,
+  combinations, activeId, hasTempFilter, anchorRect,
   onSelect, onEdit, onDelete, onNew, onClose,
 }: PopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -140,10 +141,13 @@ export function MetricFilterPopover({
         overflow: 'hidden',
       }}
     >
+      {/* Header label */}
+      <div style={{ padding: '8px 14px 4px', fontSize: 12, color: '#8c8c8c', fontWeight: 500 }}>常用指标筛选</div>
+
       {/* 全部（不筛选） */}
       <DropdownItem
         label="全部（不筛选）"
-        active={activeId === null}
+        active={activeId === null && !hasTempFilter}
         onClick={() => { onSelect(null); onClose(); }}
       />
 
@@ -159,20 +163,13 @@ export function MetricFilterPopover({
         />
       ))}
 
-      {/* New */}
-      <div style={{
-        borderTop: combinations.length > 0 ? '1px solid #f0f0f0' : 'none',
-        padding: '4px 8px',
-      }}>
-        <Button
-          type="dashed"
-          icon={<PlusOutlined />}
-          onClick={onNew}
-          block
-          style={{ fontSize: 13, color: '#1890ff', borderColor: '#91caff' }}
-        >
-          新建组合
-        </Button>
+      {/* Custom */}
+      <div style={{ borderTop: '1px solid #f0f0f0' }}>
+        <DropdownItem
+          label="自定义"
+          active={!!hasTempFilter}
+          onClick={() => { onNew(); onClose(); }}
+        />
       </div>
     </div>
   );
@@ -383,14 +380,17 @@ function MetricCascadeSelect({ value, onChange }: {
 interface EditModalProps {
   initial: FilterCombination | null; // null = creating new
   onSave:  (combo: FilterCombination) => void;
+  onApply?: (combo: FilterCombination) => void;
   onClose: () => void;
 }
 
-export function MetricFilterEditModal({ initial, onSave, onClose }: EditModalProps) {
+export function MetricFilterEditModal({ initial, onSave, onApply, onClose }: EditModalProps) {
+  const isEditing = !!initial?.name;
   const [name, setName] = useState(initial?.name ?? '');
   const [groups, setGroups] = useState<FilterGroup[]>(
     initial?.groups && initial.groups.length > 0 ? initial.groups : [makeGroup()]
   );
+  const [saveAsTemplate, setSaveAsTemplate] = useState(isEditing);
 
   // ── group ops ────────────────────
   const addGroup    = () => setGroups(p => [...p, makeGroup()]);
@@ -419,47 +419,64 @@ export function MetricFilterEditModal({ initial, onSave, onClose }: EditModalPro
       }
     ));
 
-  const canSave = name.trim().length > 0;
+  const canSave = saveAsTemplate ? name.trim().length > 0 : true;
 
   const handleSave = () => {
     if (!canSave) return;
-    onSave({ id: initial?.id ?? genId(), name: name.trim(), groups });
+    const combo: FilterCombination = { id: initial?.id ?? genId(), name: name.trim(), groups };
+    if (saveAsTemplate) {
+      onSave(combo);
+    } else if (onApply) {
+      onApply({ ...combo, name: '' });
+    }
   };
 
   return (
     <Modal
       open
-      title={initial ? '编辑筛选组合' : '新建筛选组合'}
+      title={isEditing ? '编辑筛选组合' : '自定义指标筛选'}
       onCancel={onClose}
       width={680}
       styles={{ body: { maxHeight: '60vh', overflowY: 'auto', padding: '18px 20px' } }}
       footer={
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <Button onClick={onClose}>取消</Button>
-          <Button
-            type="primary"
-            disabled={!canSave}
-            onClick={handleSave}
-          >
-            保存
-          </Button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {!isEditing && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderTop: '1px solid #f0f0f0', paddingTop: 12 }}>
+              <Checkbox checked={saveAsTemplate} onChange={e => setSaveAsTemplate(e.target.checked)}>
+                <span style={{ fontSize: 13 }}>保存为常用指标筛选</span>
+              </Checkbox>
+              {saveAsTemplate && (
+                <Input
+                  value={name}
+                  onChange={e => { if (e.target.value.length <= 10) setName(e.target.value); }}
+                  placeholder="请输入模板名称"
+                  maxLength={10}
+                  showCount
+                  style={{ flex: 1, fontSize: 13 }}
+                />
+              )}
+            </div>
+          )}
+          {isEditing && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderTop: '1px solid #f0f0f0', paddingTop: 12 }}>
+              <span style={{ fontSize: 13, color: '#333', whiteSpace: 'nowrap' }}>模板名称</span>
+              <Input
+                value={name}
+                onChange={e => { if (e.target.value.length <= 10) setName(e.target.value); }}
+                placeholder="请输入模板名称"
+                maxLength={10}
+                showCount
+                style={{ flex: 1, fontSize: 13 }}
+              />
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <Button onClick={onClose}>取消</Button>
+            <Button type="primary" disabled={!canSave} onClick={handleSave}>确定</Button>
+          </div>
         </div>
       }
     >
-      {/* Name */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 13, color: '#555', marginBottom: 6 }}>
-          组合名称 <span style={{ color: '#ff4d4f' }}>*</span>
-        </div>
-        <Input
-          autoFocus
-          value={name}
-          onChange={e => setName(e.target.value)}
-          placeholder="请输入组合名称，如「高消耗ROI达标」"
-          status={name.trim() ? undefined : 'error'}
-          style={{ fontSize: 13 }}
-        />
-      </div>
 
       {/* Condition groups */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>

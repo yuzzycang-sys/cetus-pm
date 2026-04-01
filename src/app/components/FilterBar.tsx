@@ -59,6 +59,7 @@ interface Props {
   onPriceRangeChange?: (min: string, max: string, roiMin: string, roiMax: string) => void;
   channelLocked?: boolean;
   onChannelLockedClick?: () => void;
+  disabledFilterValues?: Record<string, string[]>;
 }
 
 export function FilterBar({
@@ -68,6 +69,7 @@ export function FilterBar({
   priceRange = { min: '', max: '', roiMin: '', roiMax: '' },
   onPriceRangeChange,
   channelLocked, onChannelLockedClick,
+  disabledFilterValues = {},
 }: Props) {
   const [showAllFilters, setShowAllFilters] = useState(false);
   const [allFilterPos, setAllFilterPos] = useState<{ left: number; top: number } | null>(null);
@@ -246,6 +248,7 @@ export function FilterBar({
                     onExcludeChange={ex =>
                       setFilterExcludes(prev => ({ ...prev, [key]: ex }))
                     }
+                    disabledValues={disabledFilterValues[key]}
                   />
                   {isLocked && (
                     <div onClick={e => { e.stopPropagation(); onChannelLockedClick?.(); }}

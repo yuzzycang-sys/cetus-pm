@@ -344,10 +344,12 @@ interface Props {
   views?: ViewItem[];
   onSave: (tags: QuickTag[]) => void;
   onClose: () => void;
+  blockedMainChannels?: Set<string>;
+  blockedSubChannels?: Set<string>;
 }
 
 /* ──────────────────────────────────────────────────────────── */
-export function QuickTagModal({ tags: initialTags, views, onSave, onClose }: Props) {
+export function QuickTagModal({ tags: initialTags, views, onSave, onClose, blockedMainChannels, blockedSubChannels }: Props) {
   const [tags, setTags] = useState<QuickTag[]>(initialTags);
   const [tab, setTab] = useState<'all'|'mine'|'shared'>('all');
   const [search, setSearch] = useState('');
@@ -879,16 +881,20 @@ export function QuickTagModal({ tags: initialTags, views, onSave, onClose }: Pro
                   </div>
                   {fMainCh.length > 0 && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                      {fMainCh.map(c => (
-                        <Tag
-                          key={c}
-                          closable={!isReadonly}
-                          onClose={() => setFMainCh(prev => prev.filter(x => x !== c))}
-                          style={{ fontSize: 12 }}
-                        >
-                          {c.split('-').pop()}
-                        </Tag>
-                      ))}
+                      {fMainCh.map(c => {
+                        const isBlocked = blockedMainChannels?.has(c);
+                        return (
+                          <Tag
+                            key={c}
+                            closable={!isReadonly && !isBlocked}
+                            onClose={() => setFMainCh(prev => prev.filter(x => x !== c))}
+                            style={{ fontSize: 12, ...(isBlocked ? { color: '#bfbfbf', borderColor: '#ffa39e', background: '#fff2f0' } : {}) }}
+                          >
+                            {c.split('-').pop()}
+                            {isBlocked && <span style={{ marginLeft: 4, fontSize: 10, color: '#ff4d4f' }}>无权限</span>}
+                          </Tag>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -923,11 +929,16 @@ export function QuickTagModal({ tags: initialTags, views, onSave, onClose }: Pro
                           <span style={{ flex: 1 }}>子渠道标识</span>
                           {!isReadonly && <span style={{ width: 40, textAlign: 'center' }}>操作</span>}
                         </div>
-                        {fSubCh.map((c, i) => (
-                          <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '7px 14px', borderBottom: i<fSubCh.length-1?'1px solid #f0f0f0':'none', fontSize: 13 }}>
+                        {fSubCh.map((c, i) => {
+                          const isSubBlocked = blockedSubChannels?.has(c);
+                          return (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '7px 14px', borderBottom: i<fSubCh.length-1?'1px solid #f0f0f0':'none', fontSize: 13, ...(isSubBlocked ? { opacity: 0.6, background: '#fff2f0' } : {}) }}>
                             <span style={{ width: 32, color: '#999', fontSize: 12 }}>{i+1}</span>
-                            <span style={{ flex: 1, fontFamily: 'monospace', fontSize: 12 }}>{c}</span>
-                            {!isReadonly && (
+                            <span style={{ flex: 1, fontFamily: 'monospace', fontSize: 12, color: isSubBlocked ? '#bfbfbf' : undefined }}>{c}</span>
+                            {isSubBlocked && (
+                              <Tag color="default" style={{ marginInlineEnd: 0, fontSize: 10, lineHeight: '14px', padding: '0 4px', color: '#ff4d4f', borderColor: '#ffa39e', background: '#fff2f0' }}>无权限</Tag>
+                            )}
+                            {!isReadonly && !isSubBlocked && (
                               <span style={{ width: 40, textAlign: 'center' }}>
                                 <X size={14} color="#ddd" style={{ cursor: 'pointer' }}
                                   onClick={() => setFSubCh(prev => prev.filter((_,idx) => idx !== i))}
@@ -937,7 +948,8 @@ export function QuickTagModal({ tags: initialTags, views, onSave, onClose }: Pro
                               </span>
                             )}
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                       <Typography.Text type="secondary" style={{ fontSize: 11, marginTop: 4, display: 'block' }}>
                         共 {fSubCh.length} 个子渠道

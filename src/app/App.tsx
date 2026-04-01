@@ -45,6 +45,16 @@ type PageStatus =
   | { type: 'NO_PERMISSION'; missingTagsInfo: TagInfo[] }
   | { type: 'VIEW_NO_PERMISSION'; viewName: string; owner: string; shareMode: string };
 
+// ── Data-level permissions (from permission center) ────────
+// Games/channels 张三 does NOT have access to
+const BLOCKED_GAMES = new Set(['深海传说', '星辰大海']);
+const BLOCKED_MAIN_CHANNELS = new Set(['星海-TikTok-TK_xh01', '星海-百度-BD_xh01']);
+const BLOCKED_SUB_CHANNELS = new Set(['tk_brand_01', 'bd_brand_01', 'bd_brand_02']);
+
+type ViewSnapshot = {
+  filterSelections?: Record<string, string[]>;
+};
+
 function canUserAccessView(userName: string, view: ViewItem): boolean {
   if (view.type === 'public') return true;
   if (view.owner === userName) return true;
@@ -117,6 +127,19 @@ const INITIAL_VIEWS: ViewItem[] = [
   { id: '9', name: '渠道大盘',           type: 'public', pinned: false },
   // View 10: shared to 张三 by 赵云, but tags t51(private/赵云) and t52(partial, 张三 not in authUsers) are inaccessible
   { id: '10', name: '投放核心数据总览',  type: 'shared', owner: '赵云', pinned: false, tag_ids: ['t51', 't52'] },
+  // View 11: Conflict B (filter values with no permission)
+  {
+    id: '11', name: '李四的全渠道周报', type: 'shared', owner: '李四', pinned: false,
+    tag_ids: ['t8'],
+    snapshot: {
+      filterSelections: {
+        game: ['捕鱼大咖', '鱼乐天下', '深海传说', '星辰大海'],
+        mainChannel: ['大咖-头条-头条btt', '大咖-快手-快手ksa', '星海-TikTok-TK_xh01', '星海-百度-BD_xh01'],
+      },
+    },
+  },
+  // View 12: Conflict D/F — tag with partial channel permissions
+  { id: '12', name: '标签部分渠道无权限测试', type: 'shared', owner: '李四', pinned: false, tag_ids: ['t53'] },
 ];
 
 // Views that exist in the system but are NOT in 张三's view list — only reachable via shared links
@@ -178,6 +201,8 @@ const INITIAL_TAGS: QuickTag[] = [
   { id: 't50', label: '全媒体-年度大包',  color: 'green',   active: false, owner: '陈路遥', updatedAt: '2026-02-03T08:00:00+08:00', mainChannels: ['大咖-头条-头条btt','大咖-快手-快手ksa','大咖-广点通-广点通gdt01','大咖-微博-微博wb01','大咖-抖音-抖音dy01'], subChannels: ['tt00zs01','ks_all_01','gdt_main_a01','wb_fan_01','dy_feed_01'], vis: 'public', authUsers: [] },
   { id: 't51', label: '头条-核心ROI秘投', color: 'red',     active: false, owner: '赵云',   updatedAt: '2026-02-02T10:30:00+08:00', mainChannels: ['大咖-头条-头条btt','大咖-头条-头条btoutiao'], subChannels: ['tt_secret_01','tt_secret_02','tt_secret_03'], vis: 'private', authUsers: [] },
   { id: 't52', label: '快手-内部测试包',  color: 'cyan',    active: false, owner: '王五',   updatedAt: '2026-02-01T14:20:00+08:00', mainChannels: ['大咖-快手-快手ksa','大咖-快手-快手ksb'], subChannels: ['ks_internal_01','ks_internal_02'], vis: 'partial', authUsers: ['李四','赵云','陈路遥'] },
+  // Conflict D/F test tag: 张三 can see this tag (public), but some channels inside are blocked
+  { id: 't53', label: '标签部分渠道无权限', color: 'red', active: false, owner: '李四', updatedAt: '2026-03-30T10:00:00+08:00', mainChannels: ['大咖-头条-头条btt', '大咖-快手-快手ksa', '星海-TikTok-TK_xh01', '星海-百度-BD_xh01'], subChannels: ['tt00zs01', 'tt00zs02', 'ks_all_01', 'tk_brand_01', 'bd_brand_01', 'bd_brand_02'], vis: 'public', authUsers: [] },
 ];
 
 // ── Scene 1: TagPermAlignDialog ─────────────────────────────
@@ -390,6 +415,10 @@ export default function App() {
   const [pageStatus, setPageStatus] = useState<PageStatus>({ type: 'OK' });
   const [pendingShareAction, setPendingShareAction] = useState<PendingShareAction | null>(null);
 
+  // ── Conflict state ─────────────────────────────────────────
+  const [disabledFilterValues, setDisabledFilterValues] = useState<Record<string, string[]>>({});
+  const [hasConflict, setHasConflict] = useState(false);
+
   // ── Shared link simulation ────────────────────────────────
   const [showShareLinkPanel, setShowShareLinkPanel] = useState(false);
 
@@ -432,14 +461,27 @@ export default function App() {
   const handleTogglePin = (id: string) =>
     setViews(prev => prev.map(v => v.id === id ? { ...v, pinned: !v.pinned } : v));
 
-  const handleSaveNew = (name: string) => {
-    // Capture currently active tag IDs when saving
+  // ── Conflict G: save-as-new with permission conflicts ──
+  const [pendingSaveName, setPendingSaveName] = useState<string | null>(null);
+
+  const doSaveNewView = (name: string) => {
     const tagIds = quickTags.filter(t => t.active).map(t => t.id);
     setViews(prev => [...prev, {
       id: String(Date.now()), name, type: 'mine', pinned: false,
       tag_ids: tagIds.length > 0 ? tagIds : undefined,
     }]);
     setSelectedView(name);
+    setDisabledFilterValues({});
+    setHasConflict(false);
+    setPendingSaveName(null);
+  };
+
+  const handleSaveNew = (name: string) => {
+    if (hasConflict) {
+      setPendingSaveName(name);
+      return;
+    }
+    doSaveNewView(name);
   };
 
   // ── Shared link: attempt to open external view ──────────
@@ -462,11 +504,21 @@ export default function App() {
 
   const handleBackFromNoPermission = () => {
     setPageStatus({ type: 'OK' });
+    setDisabledFilterValues({});
+    setHasConflict(false);
   };
 
-  // ── Scene 3: Load view → check tag permissions ────────────
+  // ── Load view → full conflict detection (B/C/D/E) ────────
   const handleSelectView = (name: string) => {
     const view = views.find(v => v.name === name);
+    const toasts: string[] = [];
+    let blocked = false;
+
+    // Reset conflict state
+    setDisabledFilterValues({});
+    setHasConflict(false);
+
+    // ── Conflict C: invisible tags (highest priority) ──
     if (view?.tag_ids && view.tag_ids.length > 0) {
       const missingTags: TagInfo[] = [];
       for (const tagId of view.tag_ids) {
@@ -476,14 +528,44 @@ export default function App() {
         }
       }
       if (missingTags.length > 0) {
-        // Hard block: show NO_PERMISSION empty state
         setPageStatus({ type: 'NO_PERMISSION', missingTagsInfo: missingTags });
         setSelectedView(name);
         setActivePinnedTag(null);
-        // Don't activate any tags
+        toast('当前视图含有你无权访问的快捷标签', { duration: 4000 });
         return;
       }
-      // All accessible: activate the view's tags
+    }
+
+    // ── Conflict B: filter values with no permission ──
+    if (view?.snapshot?.filterSelections) {
+      const disabled: Record<string, string[]> = {};
+      const snap = view.snapshot.filterSelections;
+      for (const [key, values] of Object.entries(snap)) {
+        const blockedVals: string[] = [];
+        const allowedVals: string[] = [];
+        for (const v of values) {
+          if (key === 'game' && BLOCKED_GAMES.has(v)) blockedVals.push(v);
+          else if (key === 'mainChannel' && BLOCKED_MAIN_CHANNELS.has(v)) blockedVals.push(v);
+          else if (key === 'subChannel' && BLOCKED_SUB_CHANNELS.has(v)) blockedVals.push(v);
+          else allowedVals.push(v);
+        }
+        if (blockedVals.length > 0) disabled[key] = blockedVals;
+        // Apply allowed values + blocked values (for display) to filter selections
+        setFilterSelections(prev => ({ ...prev, [key]: [...allowedVals, ...blockedVals] }));
+        // Make sure the filter key is visible
+        if (!activeFilters.includes(key)) {
+          setActiveFilters(prev => [...prev, key]);
+        }
+      }
+      if (Object.keys(disabled).length > 0) {
+        setDisabledFilterValues(disabled);
+        setHasConflict(true);
+        toasts.push('当前视图包含你无权限访问的内容');
+      }
+    }
+
+    // ── Conflict D: tags with partial channel perms ──
+    if (view?.tag_ids && view.tag_ids.length > 0) {
       setQuickTags(prev => prev.map(t => ({
         ...t,
         active: (view.tag_ids ?? []).includes(t.id),
@@ -492,13 +574,19 @@ export default function App() {
       if (willBeActive && !channelLocked) setChannelLocked(true);
       else if (!willBeActive && channelLocked) setChannelLocked(false);
     } else {
-      // View has no tags: deactivate all tags
       setQuickTags(prev => prev.map(t => ({ ...t, active: false })));
       if (channelLocked) {
         setChannelLocked(false);
-        toast('主/子渠道筛选恢复生效');
       }
     }
+
+    // ── Toast: sequential, non-stacking, priority order ──
+    if (!blocked && toasts.length > 0) {
+      toasts.forEach((msg, i) => {
+        setTimeout(() => toast(msg, { duration: 4000 }), i * 4200);
+      });
+    }
+
     setPageStatus({ type: 'OK' });
     setSelectedView(name);
     setActivePinnedTag(null);
@@ -727,6 +815,7 @@ export default function App() {
                 onPriceRangeChange={(min, max, roiMin, roiMax) => setPriceRange({ min, max, roiMin, roiMax })}
                 channelLocked={channelLocked}
                 onChannelLockedClick={() => toast('快捷标签选中时，主/子渠道筛选不可用')}
+                disabledFilterValues={disabledFilterValues}
               />
               <QuickTagBar
                 tags={quickTags}
@@ -808,6 +897,7 @@ export default function App() {
                 onChangeLocalFilters={setLocalFilters}
                 dimAutoUpdate={currentSheetState.dimAutoUpdate ?? false}
                 onChangeDimAutoUpdate={v => updateSheetState({ dimAutoUpdate: v })}
+                queryDisabled={pageStatus.type === 'NO_PERMISSION'}
               />
 
               {/* ── Tag-level NO_PERMISSION empty state ── */}
@@ -913,6 +1003,8 @@ export default function App() {
           views={views}
           onSave={tags => setQuickTags(tags)}
           onClose={() => setShowTagModal(false)}
+          blockedMainChannels={BLOCKED_MAIN_CHANNELS}
+          blockedSubChannels={BLOCKED_SUB_CHANNELS}
         />
       )}
 
@@ -938,6 +1030,40 @@ export default function App() {
           onSaveAnyway={handleShareAnyway}
           onCancel={() => setPendingShareAction(null)}
         />
+      )}
+
+      {/* ── Conflict G: Save-as-new confirmation ── */}
+      {pendingSaveName && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 2000,
+          background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 12, padding: '28px 32px', width: 420,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.18)', fontFamily: F,
+          }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#141414', marginBottom: 12 }}>确认保存</div>
+            <div style={{ fontSize: 13, color: '#595959', lineHeight: 1.7, marginBottom: 20 }}>
+              当前视图存在无权限内容，另存为新视图时将仅保存您有权限的配置内容：
+              {Object.keys(disabledFilterValues).length > 0 && (
+                <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 6, background: '#fff2f0', border: '1px solid #ffa39e', fontSize: 12 }}>
+                  <span style={{ color: '#ff4d4f', fontWeight: 500 }}>无权限筛选值将被移除</span>
+                  <span style={{ color: '#8c8c8c' }}>（{Object.values(disabledFilterValues).flat().join('、')}）</span>
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button
+                onClick={() => setPendingSaveName(null)}
+                style={{ padding: '6px 20px', borderRadius: 6, border: '1px solid #d9d9d9', background: '#fff', cursor: 'pointer', fontSize: 13 }}
+              >取消</button>
+              <button
+                onClick={() => doSaveNewView(pendingSaveName)}
+                style={{ padding: '6px 20px', borderRadius: 6, border: 'none', background: '#1890ff', color: '#fff', cursor: 'pointer', fontSize: 13 }}
+              >确定保存</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
     </ConfigProvider>

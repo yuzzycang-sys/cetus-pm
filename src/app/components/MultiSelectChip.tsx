@@ -13,6 +13,7 @@ interface Props {
   onChange: (selected: string[]) => void;
   exclude: boolean;
   onExcludeChange: (exclude: boolean) => void;
+  disabledValues?: string[];
 }
 
 function parseTokens(raw: string): string[] {
@@ -36,7 +37,9 @@ function CustomBadge({ kind }: { kind: CustomKind | undefined }) {
 
 export function MultiSelectChip({
   label, options, optionAnnotations, selected, onChange, exclude, onExcludeChange,
+  disabledValues = [],
 }: Props) {
+  const disabledSet = useMemo(() => new Set(disabledValues), [disabledValues]);
   const [open, setOpen]           = useState(false);
   const [search, setSearch]       = useState('');
   const [tab, setTab]             = useState<'all' | 'selected'>('all');
@@ -176,6 +179,9 @@ export function MultiSelectChip({
 
   const hasSelection = selected.length > 0;
 
+  const disabledCount = selected.filter(s => disabledSet.has(s)).length;
+  const enabledSelected = selected.filter(s => !disabledSet.has(s));
+
   let displayValue: string;
   if (!hasSelection) {
     displayValue = '不限';
@@ -185,10 +191,13 @@ export function MultiSelectChip({
       ? `排除 ${names} 等${selected.length}项`
       : `排除 ${names}`;
   } else {
-    const names = selected.slice(0, 2).join('、');
-    displayValue = selected.length > 2
-      ? `${names} 等${selected.length}项`
-      : names;
+    const names = enabledSelected.slice(0, 2).join('、');
+    const suffix = disabledCount > 0 ? ` (${disabledCount}项无权限)` : '';
+    displayValue = enabledSelected.length > 2
+      ? `${names} 等${enabledSelected.length}项${suffix}`
+      : enabledSelected.length > 0
+        ? `${names}${suffix}`
+        : `${disabledCount}项无权限`;
   }
 
   const activeColor       = exclude ? '#fa8c16' : '#1890ff';
@@ -354,6 +363,7 @@ export function MultiSelectChip({
                   const checked  = selected.includes(opt);
                   const isCustom = isCustomValue(opt);
                   const kind     = customMeta[opt];
+                  const isDisabled = disabledSet.has(opt);
 
                   return (
                     <div
@@ -361,7 +371,9 @@ export function MultiSelectChip({
                       onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggleOption(opt); }}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '7px 14px', cursor: 'pointer', fontSize: 13, color: '#333',
+                        padding: '7px 14px', cursor: 'pointer', fontSize: 13,
+                        color: isDisabled ? '#bfbfbf' : '#333',
+                        opacity: isDisabled ? 0.7 : 1,
                       }}
                       onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = '#f5f5f5'}
                       onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
@@ -372,10 +384,16 @@ export function MultiSelectChip({
                         flex: hasAnnotations ? '0 0 44%' : 1,
                         minWidth: 0,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        color: isCustom ? '#555' : '#333',
+                        color: isDisabled ? '#bfbfbf' : isCustom ? '#555' : '#333',
                       }}>
                         {opt}
                       </span>
+
+                      {isDisabled && (
+                        <Tag color="default" style={{ marginInlineEnd: 0, fontSize: 11, lineHeight: '16px', padding: '0 5px', color: '#ff4d4f', borderColor: '#ffa39e', background: '#fff2f0' }}>
+                          无权限
+                        </Tag>
+                      )}
 
                       {hasAnnotations && (
                         <>
