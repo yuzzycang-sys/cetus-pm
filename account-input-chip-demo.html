@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AccountInputChip 组件演示</title>
+  <link rel="stylesheet" href="https://unpkg.com/antd@5.17.0/dist/reset.css" />
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/dayjs/dayjs.min.js"></script>
+  <script src="https://unpkg.com/antd@5.17.0/dist/antd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: #f5f6f8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 24px;
+    }
+    .demo-card {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e8e8e8;
+      padding: 32px 36px;
+      width: 100%;
+      max-width: 860px;
+    }
+    .demo-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #111;
+      margin-bottom: 4px;
+    }
+    .demo-subtitle {
+      font-size: 13px;
+      color: #999;
+      margin-bottom: 28px;
+    }
+    .demo-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 20px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .demo-row:last-child { border-bottom: none; }
+    .demo-label {
+      font-size: 12px;
+      color: #888;
+      width: 120px;
+      flex-shrink: 0;
+    }
+    .state-box {
+      margin-top: 24px;
+      background: #fafafa;
+      border: 1px solid #f0f0f0;
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-size: 12px;
+      color: #666;
+      line-height: 1.8;
+    }
+    .state-box strong { color: #333; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useRef, useEffect, useMemo } = React;
+const { Button, Checkbox, Segmented, Spin } = antd;
+
+/* ─── 工具函数 ─── */
+function parseTokens(raw) {
+  return raw.split(/[\n,，\s]+/).map(s => s.trim()).filter(Boolean);
+}
+
+/* ─── AccountInputChip ─── */
+function AccountInputChip({
+  selected, onChange, exclude, onExcludeChange,
+  entityLabel = '账号', idLabel = 'ID', tabs: tabsProp,
+  onValidate, onTabChange, initialValueMeta,
+}) {
+  const [open, setOpen]               = useState(false);
+  const [activeTabIdx, setActiveTabIdx] = useState(0);
+  const [matchMode, setMatchMode]     = useState('exact');
+  const [inputText, setInputText]     = useState('');
+  const [pendingItems, setPendingItems] = useState([]);
+  const [dropPos, setDropPos]         = useState(null);
+  const [hovered, setHovered]         = useState(false);
+  const [valueMeta, setValueMeta]     = useState(initialValueMeta ?? {});
+  const [inlineText, setInlineText]   = useState('');
+  const [tabDropOpen, setTabDropOpen] = useState(false);
+  const [inlineState] = useState('idle');
+
+  const resolvedTabs = tabsProp ?? [
+    { key: 'id',   label: `${entityLabel}${idLabel}`,  placeholder: `输入${entityLabel}${idLabel}` },
+    { key: 'name', label: `${entityLabel}名称`,         placeholder: `输入${entityLabel}名称` },
+  ];
+  const activeTab = resolvedTabs[activeTabIdx] ?? resolvedTabs[0];
+
+  const wrapRef     = useRef(null);
+  const dropdownRef = useRef(null);
+  const plusBtnRef  = useRef(null);
+  const inlineRef   = useRef(null);
+  const tagInputRef = useRef(null);
+
+  useEffect(() => {
+    if (open) setTimeout(() => tagInputRef.current?.focus(), 50);
+  }, [open]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      const target = e.target;
+      const inWrap = wrapRef.current?.contains(target) || dropdownRef.current?.contains(target);
+      if (!inWrap) {
+        if (open) { setOpen(false); setInputText(''); }
+        if (tabDropOpen) setTabDropOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open, tabDropOpen]);
+
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+  const excludeRef = useRef(exclude);
+  excludeRef.current = exclude;
+
+  useEffect(() => {
+    if (inlineText.length === 0) return;
+    const hasBatchState = open || selectedRef.current.length > 0 || inputText.length > 0 || pendingItems.length > 0 || excludeRef.current;
+    if (!hasBatchState) return;
+    setOpen(false);
+    setInputText('');
+    setPendingItems([]);
+    onExcludeChange(false);
+    onChange([]);
+    setValueMeta({});
+  }, [inlineText]);
+
+  const handleInlineFocus = () => {
+    if (open) setOpen(false);
+  };
+
+  const handlePlusClick = () => {
+    if (open) { setOpen(false); setInputText(''); return; }
+    if (plusBtnRef.current) {
+      const r = plusBtnRef.current.getBoundingClientRect();
+      setDropPos({ left: r.right - 360, top: r.bottom + 4 });
+    }
+    setOpen(true);
+  };
+
+  // 已选项减少时，把 overflow chip 按顺序转回 valid
+  useEffect(() => {
+    setPendingItems(prev => {
+      const overflows = prev.filter(p => p.status === 'overflow');
+      if (overflows.length === 0) return prev;
+      const remaining = MAX_COUNT - selected.length;
+      if (remaining <= 0) return prev;
+      const toRestore = new Set(overflows.slice(0, remaining).map(p => p.value));
+      return prev.map(p => toRestore.has(p.value) ? { ...p, status: 'valid' } : p);
+    });
+  }, [selected.length]);
+
+  const tokens = useMemo(() => parseTokens(inputText), [inputText]);
+
+  const switchMode = (m) => {
+    if (m === matchMode) return;
+    setMatchMode(m);
+    setPendingItems([]);
+    setInputText('');
+    tagInputRef.current?.focus();
+  };
+
+  const switchTab = (idx) => {
+    if (idx === activeTabIdx) return;
+    setActiveTabIdx(idx);
+    onTabChange?.(idx);
+    onChange([]);
+    onExcludeChange(false);
+    setValueMeta({});
+    setInputText('');
+    setPendingItems([]);
+  };
+
+  const handleKeyDown = async (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (tokens.length === 0) return;
+
+    const pendingValues = new Set(pendingItems.map(p => p.value));
+    const selectedValues = new Set(selected);
+    const duplicates = tokens.filter(t => pendingValues.has(t) || selectedValues.has(t));
+    const seen = new Set();
+    const freshTokens = tokens.filter(t => {
+      if (pendingValues.has(t) || selectedValues.has(t) || seen.has(t)) return false;
+      seen.add(t);
+      return true;
+    });
+    const duplicateItems = duplicates.map(t => ({ value: t, status: 'duplicate' }));
+
+    if (matchMode === 'exact' && onValidate && freshTokens.length > 0) {
+      setPendingItems(prev => [
+        ...prev,
+        ...duplicateItems,
+        ...freshTokens.map(t => ({ value: t, status: 'validating' })),
+      ]);
+      setInputText('');
+      try {
+        const { valid, invalid } = await onValidate(freshTokens);
+        const validSet = new Set(valid);
+        setPendingItems(prev =>
+          prev.map(p =>
+            freshTokens.includes(p.value)
+              ? { ...p, status: validSet.has(p.value) ? 'valid' : 'invalid' }
+              : p
+          )
+        );
+      } catch {
+        setPendingItems(prev =>
+          prev.map(p => freshTokens.includes(p.value) ? { ...p, status: 'invalid' } : p)
+        );
+      }
+    } else {
+      setPendingItems(prev => [
+        ...prev,
+        ...duplicateItems,
+        ...freshTokens.map(t => ({ value: t, status: 'valid' })),
+      ]);
+      setInputText('');
+    }
+    tagInputRef.current?.focus();
+  };
+
+  const MAX_COUNT = 300;
+
+  const handleConfirm = () => {
+    const validItems = pendingItems.filter(p => p.status === 'valid').map(p => p.value);
+    if (validItems.length === 0) return;
+    const remaining  = MAX_COUNT - selected.length;
+    const newOnes    = validItems.filter(t => !selected.includes(t));
+    const toAdd      = newOnes.slice(0, remaining);
+    const keepPending = new Set(newOnes.slice(remaining));
+    if (toAdd.length > 0) {
+      onChange([...selected, ...toAdd]);
+      const meta = {};
+      toAdd.forEach(t => { meta[t] = matchMode; });
+      setValueMeta(prev => ({ ...prev, ...meta }));
+    }
+    setPendingItems(prev =>
+      prev
+        .filter(p => p.status !== 'valid' || keepPending.has(p.value))
+        .map(p => keepPending.has(p.value) ? { ...p, status: 'overflow' } : p)
+    );
+    setInlineText('');
+    tagInputRef.current?.focus();
+  };
+
+  const handleRemove = (v) => {
+    onChange(selected.filter(s => s !== v));
+    setValueMeta(prev => { const n = { ...prev }; delete n[v]; return n; });
+  };
+
+  const handleClear = () => {
+    onChange([]);
+    onExcludeChange(false);
+    setValueMeta({});
+  };
+
+  const hasSelection = selected.length > 0;
+  const subLabel = activeTab.label;
+  const isValidating   = pendingItems.some(p => p.status === 'validating');
+  const validCount     = pendingItems.filter(p => p.status === 'valid').length;
+  const hasValidPending = validCount > 0;
+
+  const chipStyle = (status) => {
+    if (status === 'valid')      return { bg: '#e6f4ff', color: '#1677ff', border: '#91caff' };
+    if (status === 'invalid')    return { bg: '#f5f5f5', color: '#bfbfbf', border: '#d9d9d9' };
+    if (status === 'duplicate')  return { bg: '#f5f5f5', color: '#bfbfbf', border: '#d9d9d9' };
+    if (status === 'overflow')   return { bg: '#fff2e8', color: '#d46b08', border: '#ffbb96' };
+    return { bg: '#fffbe6', color: '#d48806', border: '#ffe58f' };
+  };
+
+  const borderColor = exclude ? '#fa8c16' : '#e0e0e0';
+  const plusActive  = open || selected.length > 0;
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative', flexShrink: 0, display: 'inline-flex' }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        {resolvedTabs.length === 1 && (
+          <span style={{ fontSize: 13, color: '#333', whiteSpace: 'nowrap', fontWeight: 400, flexShrink: 0 }}>{subLabel}</span>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', height: 28 }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            {resolvedTabs.length > 1 && (
+              <>
+                <span
+                  onMouseDown={e => { e.preventDefault(); setTabDropOpen(v => !v); }}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 2,
+                    fontSize: 13, color: '#333', cursor: 'pointer',
+                    userSelect: 'none', whiteSpace: 'nowrap', flexShrink: 0,
+                    marginRight: 6,
+                  }}
+                >
+                  {activeTab.label}
+                  <span style={{ fontSize: 10, color: '#aaa' }}>▾</span>
+                </span>
+                {tabDropOpen && (
+                  <div style={{
+                    position: 'absolute', top: 30, left: 0, zIndex: 10000,
+                    background: '#fff', border: '1px solid #e8e8e8',
+                    borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    minWidth: 96, overflow: 'hidden',
+                  }}>
+                    {resolvedTabs.map((tab, idx) => (
+                      <div
+                        key={tab.key}
+                        onMouseDown={e => { e.preventDefault(); switchTab(idx); setTabDropOpen(false); }}
+                        style={{
+                          padding: '7px 12px', fontSize: 13, cursor: 'pointer',
+                          background: idx === activeTabIdx ? '#e6f4ff' : '#fff',
+                          color: idx === activeTabIdx ? '#1677ff' : '#333',
+                        }}
+                        onMouseEnter={e => { if (idx !== activeTabIdx) e.currentTarget.style.background = '#f5f5f5'; }}
+                        onMouseLeave={e => { if (idx !== activeTabIdx) e.currentTarget.style.background = '#fff'; }}
+                      >{tab.label}</div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+            <input
+              ref={inlineRef}
+              value={inlineText}
+              onChange={e => setInlineText(e.target.value)}
+              onFocus={handleInlineFocus}
+              placeholder={activeTab.placeholder}
+              style={{
+                width: 180, height: 28, fontSize: 13, padding: '0 26px 0 10px',
+                border: `1px solid ${exclude ? '#fa8c16' : '#e0e0e0'}`,
+                borderRight: 'none',
+                borderRadius: '6px 0 0 6px',
+                outline: 'none', background: exclude ? '#fff7e6' : '#fff',
+                color: '#333', transition: 'border-color 0.15s',
+              }}
+              onFocus={e => { handleInlineFocus(); e.currentTarget.style.borderColor = exclude ? '#fa8c16' : '#1677ff'; }}
+              onBlur={e => e.currentTarget.style.borderColor = exclude ? '#fa8c16' : '#e0e0e0'}
+            />
+            {hovered && (inlineText || hasSelection) && (
+              <span
+                onMouseDown={e => {
+                  e.preventDefault();
+                  if (inlineText) setInlineText('');
+                  else handleClear();
+                }}
+                style={{ position: 'absolute', right: 6, cursor: 'pointer', color: '#bbb', fontSize: 15, lineHeight: 1 }}
+                onMouseEnter={e => e.currentTarget.style.color = '#999'}
+                onMouseLeave={e => e.currentTarget.style.color = '#bbb'}
+              >×</span>
+            )}
+          </div>
+
+          <button
+            ref={plusBtnRef}
+            onClick={handlePlusClick}
+            title="批量输入"
+            style={{
+              width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: `1px solid ${exclude ? '#fa8c16' : plusActive ? '#1677ff' : '#e0e0e0'}`,
+              borderRadius: '0 6px 6px 0',
+              background: exclude ? '#fff7e6' : plusActive ? '#e6f4ff' : '#fff',
+              cursor: 'pointer', fontSize: 18, fontWeight: 300,
+              color: exclude ? '#fa8c16' : plusActive ? '#1677ff' : '#999',
+              outline: 'none', transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { if (!open && !exclude && !selected.length) { e.currentTarget.style.borderColor = '#1677ff'; e.currentTarget.style.color = '#1677ff'; } }}
+            onMouseLeave={e => { if (!open && !exclude && !selected.length) { e.currentTarget.style.borderColor = '#e0e0e0'; e.currentTarget.style.color = '#999'; } }}
+          >+</button>
+        </div>
+      </div>
+
+      {/* 批量面板 */}
+      {open && dropPos && (
+        <div
+          ref={dropdownRef}
+          style={{
+            position: 'fixed', left: dropPos.left, top: dropPos.top,
+            zIndex: 9999, background: '#fff', borderRadius: 8,
+            border: '1px solid #e8e8e8', boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
+            width: 360,
+            maxHeight: `calc(100vh - ${dropPos.top + 16}px)`,
+            overflowY: 'auto',
+          }}
+        >
+          {/* 顶栏 */}
+          <div style={{
+            display: 'flex', alignItems: 'center',
+            borderBottom: '1px solid #f0f0f0', padding: '0 12px',
+            position: 'sticky', top: 0, background: '#fff', zIndex: 1,
+          }}>
+            <div style={{ display: 'flex', flex: 1 }}>
+              {resolvedTabs.length > 1 ? resolvedTabs.map((tab, idx) => {
+                const active = idx === activeTabIdx;
+                return (
+                  <div key={tab.key} onClick={() => switchTab(idx)} style={{
+                    padding: '8px 10px 7px', fontSize: 13, cursor: 'pointer',
+                    color: active ? '#1890ff' : '#555',
+                    borderBottom: active ? '2px solid #1890ff' : '2px solid transparent',
+                    fontWeight: active ? 500 : 400,
+                    marginBottom: -1, userSelect: 'none',
+                  }}>{tab.label}</div>
+                );
+              }) : (
+                <div style={{ padding: '8px 10px 7px', fontSize: 13, color: '#333' }}>{resolvedTabs[0].label}</div>
+              )}
+            </div>
+            <style>{`
+              .ac-seg .ant-segmented-item { font-size: 12px !important; }
+              .ac-seg .ant-segmented-item-selected { color: #1677ff !important; }
+            `}</style>
+            <Segmented
+              size="small"
+              value={matchMode}
+              onChange={v => switchMode(v)}
+              options={[{ label: '精确', value: 'exact' }, { label: '模糊', value: 'fuzzy' }]}
+              className="ac-seg"
+              style={{ flexShrink: 0 }}
+            />
+          </div>
+
+          {/* Tag 输入区 */}
+          <div style={{ padding: '10px 12px 0' }}>
+            <div style={{ position: 'relative' }}>
+            {pendingItems.length > 0 && (
+              <span
+                onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setPendingItems([]); setInputText(''); }}
+                style={{
+                  position: 'absolute', right: 8, top: 6, zIndex: 1,
+                  fontSize: 12, color: '#ff4d4f', cursor: 'pointer', userSelect: 'none',
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = '#cf1322'}
+                onMouseLeave={e => e.currentTarget.style.color = '#ff4d4f'}
+              >清空</span>
+            )}
+            <div
+              onClick={() => tagInputRef.current?.focus()}
+              style={{
+                minHeight: 100, maxHeight: 180, overflowY: 'auto',
+                border: '1px solid #d9d9d9', borderRadius: 6,
+                background: '#fafafa', padding: '6px 8px',
+                display: 'flex', flexWrap: 'wrap', alignContent: 'flex-start',
+                gap: 6, cursor: 'text',
+              }}
+            >
+              {pendingItems.map(item => {
+                const c = chipStyle(item.status);
+                return (
+                  <span key={item.value} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 3,
+                    padding: '1px 7px', borderRadius: 4, fontSize: 12,
+                    background: c.bg, color: c.color, border: `1px solid ${c.border}`,
+                    lineHeight: '20px', flexShrink: 0,
+                  }}>
+                    {item.status === 'validating' && <Spin size="small" style={{ marginRight: 2 }} />}
+                    {item.value}
+                    {item.status === 'invalid'   && <span style={{ fontSize: 11, color: '#bfbfbf' }}>(无效)</span>}
+                    {item.status === 'duplicate' && <span style={{ fontSize: 11, color: '#bfbfbf' }}>(重复)</span>}
+                    {item.status === 'overflow'  && <span style={{ fontSize: 11, color: '#d46b08' }}>(已达上限)</span>}
+                    {item.status !== 'validating' && (
+                      <span
+                        onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setPendingItems(prev => prev.filter(p => p.value !== item.value)); }}
+                        style={{ cursor: 'pointer', fontSize: 13, lineHeight: 1, color: c.border, marginLeft: 1 }}
+                        onMouseEnter={e => e.currentTarget.style.color = c.color}
+                        onMouseLeave={e => e.currentTarget.style.color = c.border}
+                      >×</span>
+                    )}
+                  </span>
+                );
+              })}
+              <input
+                ref={tagInputRef}
+                value={inputText}
+                onChange={e => setInputText(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={pendingItems.length === 0
+                  ? `${activeTab.placeholder}，支持逗号/空格分隔，回车${matchMode === 'exact' && onValidate ? '校验' : '确认'}`
+                  : '继续输入…'}
+                style={{
+                  border: 'none', outline: 'none', background: 'transparent',
+                  fontSize: 12, color: '#333', lineHeight: '24px',
+                  minWidth: 160, flex: 1,
+                }}
+              />
+            </div>
+            </div>
+          </div>
+
+          {/* 确认按钮 */}
+          <div style={{ padding: '8px 12px 0' }}>
+            {selected.length >= MAX_COUNT ? (
+              <Button block disabled>已达 {MAX_COUNT} 项上限</Button>
+            ) : tokens.length > 0 ? (
+              <Button block onClick={() => handleKeyDown({ key: 'Enter', preventDefault: () => {} })}>
+                {matchMode === 'exact' && onValidate ? '回车校验' : '回车确认'}
+              </Button>
+            ) : isValidating ? (
+              <Button block disabled>校验中…</Button>
+            ) : hasValidPending ? (
+              <Button block type="primary" onClick={handleConfirm}
+                style={matchMode === 'fuzzy' ? { background: '#7c4dff', borderColor: '#7c4dff' } : undefined}>
+                {validCount > MAX_COUNT - selected.length
+                  ? `添加前 ${MAX_COUNT - selected.length} 个有效项`
+                  : `添加 ${validCount} 个有效项`}
+              </Button>
+            ) : pendingItems.length > 0 ? (
+              <Button block disabled>无有效项可添加</Button>
+            ) : (
+              <Button block disabled>请输入内容</Button>
+            )}
+          </div>
+
+          {/* 已选列表 */}
+          <div style={{ borderTop: '1px solid #f0f0f0', marginTop: 8 }}>
+            <div style={{ padding: '8px 14px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 12, color: '#999' }}>
+                已添加 {selected.length} / {MAX_COUNT} 项
+              </span>
+              {selected.length > 0 && (
+                <Button type="link" size="small" onClick={handleClear} style={{ fontSize: 12, padding: 0, height: 'auto' }}>清空</Button>
+              )}
+            </div>
+            {selected.length > 0 && (
+              <div style={{ maxHeight: 150, overflowY: 'auto', padding: '0 0 4px' }}>
+                {selected.map(v => (
+                  <div
+                    key={v}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 14px' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f5f5f5'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <span style={{ flex: 1, fontSize: 12, color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span>
+                    {valueMeta[v] && (
+                      <span style={{
+                        fontSize: 11, borderRadius: 3, padding: '0 4px', flexShrink: 0,
+                        ...(valueMeta[v] === 'fuzzy'
+                          ? { color: '#7c4dff', background: '#f3f0ff', border: '1px solid #d3adf7' }
+                          : { color: '#52c41a', background: '#f6ffed', border: '1px solid #b7eb8f' })
+                      }}>
+                        {valueMeta[v] === 'fuzzy' ? '模糊' : '精确'}
+                      </span>
+                    )}
+                    <span style={{ cursor: 'pointer', color: '#bbb', flexShrink: 0, fontSize: 13 }} onClick={() => handleRemove(v)}>✕</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 排除 */}
+          <div style={{
+            display: 'flex', alignItems: 'center', padding: '7px 14px 10px',
+            borderTop: '1px solid #f0f0f0', background: '#fafafa',
+          }}>
+            <div onClick={() => onExcludeChange(!exclude)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}>
+              <Checkbox checked={exclude} style={{ pointerEvents: 'none' }} />
+              <span style={{ fontSize: 12, color: exclude ? '#fa8c16' : '#444' }}>排除</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── 模拟校验函数 ─── */
+const MOCK_VALID = new Set([
+  'btt00zyh050','btt00zyh049','btt00zyh048','btt00zyh047','btt00zyh046',
+  'btt00zyh045','btt00zyh044','btt00zyh043','btt00zyh042','btt00zyh041',
+]);
+async function mockValidate(values) {
+  await new Promise(r => setTimeout(r, 500));
+  return {
+    valid:   values.filter(v => MOCK_VALID.has(v)),
+    invalid: values.filter(v => !MOCK_VALID.has(v)),
+  };
+}
+
+/* ─── Demo 容器 ─── */
+function App() {
+  /* 账户校验函数（按当前 Tab 区分） */
+  const [accountTabIdx, setAccountTabIdx] = useState(0);
+  const VALID_ACCOUNT_ID = new Set([
+    '34552834','65189120','34552860','34552853','34552852','34552846','34552839','34552837',
+    '34552835','34552875','34552871','34552870','34552869','34552868','34552867','34552864',
+    '34552861','46079679','46079674','46079669','46079660','46079653','46079644','46079636',
+    '46079573','46079968','46079955','46079779','46079710','46079704','46079688','46080023',
+    '46080018','46080012','46080001','46079991','46079985','46079980','48684925','48684891',
+    '48684886','48684871','48684852','48684835','48684807','48684791','48685223','48685216',
+    '48685071','48685035','48685021','48684999','48684986','48685297','48685292','48685290',
+    '48685283','48685268','48685231','50280480','48685782','48685670','48685659','48685649',
+    '48685630','48685319','48685313','48685308','48685301','50280554','50280543','50280532',
+    '50280530','50280523','50280519','50280513','50280492','50280491','50280490','50280485',
+    '50280665','50280656','50280649','50280640','50280630','50280620','50280565','50280560',
+    '50280547','50280745','50280744','50280714','50280708','50280703','50280692','50280686',
+    '50280673','50281558','50281550','50281542','50281497','50281481','50281470','50281406',
+    '50281400','50281395','50280762','54885327','54885318','54885315','54885281','50281630',
+    '50281623','50281615','50281602','50281591','50281584','57132765','57132763','57132749',
+    '57132748','57132747','54885377','54885354','54885340','57132811','57132810','57132806',
+    '57132804','57132803','57132801','57132799','57132769','57132767','57132766','57132837',
+    '57132835','57132833','57132830','57132828','57132818','57132817','57132815','57132813',
+    '57132854','57132852','57132851','57132850','57132849','57132848','57132847','57132841',
+    '57132840','57132839','57132838','57132870','57132869','57132868','57132866','57132865',
+    '57132857','57132855','57132853','57132888','57132885','57132882','57132881','57132880',
+    '57132879','57132878','57132877','57132876','57132875','58709471','58709403','58709342',
+    '57132895','57132894','57132889','58783350','58783335','58710194','58709986','58709948',
+    '58709675','58709499','57132897','58783561','58783537','58783511','58783481','58783428',
+    '58783405','58783374','58783365','58783356','82294554','82294550','82294545','82294541',
+    '82294538','82294535','82294529','82294525','82294520','58783731','58783713','58783672',
+    '58783653','58783632','58783615','58783607','58783584','58783574','58091979','58091970',
+    '58091959','58091941','58091933','58091919','58091908','58091901','58091642','58091616',
+    '58091610','58091596','58091591','58091566','58091538','58091504','58091398','58091389',
+    '82294558','58783945','58783941','58783928','58783858','58783848','58783824','58783779',
+    '58093084','58093070','58093062','58093048','58093036','58093031','58093013','58093001',
+    '58092530','58092384','58092337','58092331','58092311','58092270','58092250','58092230',
+    '58092222','58092195','58092186','58092121','58092014','58092004','58784141','58784132',
+    '58784124','58784116','58784105','58784100','58784091','58784088','58784080','58784070',
+    '58093279','58093268','58093248','58093239','58093229','58093213','58093209','58093196',
+    '58093188','58093177','58093173','58093155','58093147','58093137','58093112','58093104',
+    '58093092','58784220','58784188','58784184','58784162','58784160','58784152','58784148',
+    '58093472','58093464','58093456','58093450','58093432','58093421','58093418','58093414',
+    '58093408','58093400','58093397','58093391','58093381','58093375','58093370','58093366',
+    '58093363','58093360','58093354','58093349','58093320','58093286','59960582','59960550',
+    '59960514','59960484','59960454','59960409','59960299','59960269','58784225','64291989',
+    '64291988','64291985','64291981','64291977','64291975','62295323','62295303','62295300',
+    '62295290','62295241','62295239','62295238','58093590','58093580','58093566','58093555',
+    '58093549','58093538','58093493','65688305','65688295','65688273','59960698','59960652',
+    '59960618','41395173','41395145','41395118','64292139','64292135','64292087','64292085',
+    '64292077','64292072','64292064','64292056','64292050','64292043','64292038','64292034',
+    '64292028','64292025','64292017','64292011','64292007','64292005','64292000','65688440',
+    '65688406','65688401','65688391','65688368','65688349','65688339','65688319','46235749',
+    '46235720','46235715','46234821','46234279','43775809','43775760','43775739','41397102',
+    '41395874','41395852','41395846','41395844','41395841','41395490','41395480','41395460',
+  ]);
+  const VALID_ACCOUNT_NAME = new Set(['游酷盛世科技(北京)有限公司']);
+  async function accountValidate(values) {
+    await new Promise(r => setTimeout(r, 400));
+    const validSet = accountTabIdx === 0 ? VALID_ACCOUNT_ID : VALID_ACCOUNT_NAME;
+    return {
+      valid:   values.filter(v => validSet.has(v)),
+      invalid: values.filter(v => !validSet.has(v)),
+    };
+  }
+
+  /* 多 Tab 示例（账户 ID） */
+  const INITIAL_IDS = [
+    '34552834','65189120','34552860','34552853','34552852','34552846','34552839','34552837',
+    '34552835','34552875','34552871','34552870','34552869','34552868','34552867','34552864',
+    '34552861','46079679','46079674','46079669','46079660','46079653','46079644','46079636',
+    '46079573','46079968','46079955','46079779','46079710','46079704','46079688','46080023',
+    '46080018','46080012','46080001','46079991','46079985','46079980','48684925','48684891',
+    '48684886','48684871','48684852','48684835','48684807','48684791','48685223','48685216',
+    '48685071','48685035','48685021','48684999','48684986','48685297','48685292','48685290',
+    '48685283','48685268','48685231','50280480','48685782','48685670','48685659','48685649',
+    '48685630','48685319','48685313','48685308','48685301','50280554','50280543','50280532',
+    '50280530','50280523','50280519','50280513','50280492','50280491','50280490','50280485',
+    '50280665','50280656','50280649','50280640','50280630','50280620','50280565','50280560',
+    '50280547','50280745','50280744','50280714','50280708','50280703','50280692','50280686',
+    '50280673','50281558','50281550','50281542','50281497','50281481','50281470','50281406',
+    '50281400','50281395','50280762','54885327','54885318','54885315','54885281','50281630',
+    '50281623','50281615','50281602','50281591','50281584','57132765','57132763','57132749',
+    '57132748','57132747','54885377','54885354','54885340','57132811','57132810','57132806',
+    '57132804','57132803','57132801','57132799','57132769','57132767','57132766','57132837',
+    '57132835','57132833','57132830','57132828','57132818','57132817','57132815','57132813',
+    '57132854','57132852','57132851','57132850','57132849','57132848','57132847','57132841',
+    '57132840','57132839','57132838','57132870','57132869','57132868','57132866','57132865',
+    '57132857','57132855','57132853','57132888','57132885','57132882','57132881','57132880',
+    '57132879','57132878','57132877','57132876','57132875','58709471','58709403','58709342',
+    '57132895','57132894','57132889','58783350','58783335','58710194','58709986','58709948',
+    '58709675','58709499','57132897','58783561','58783537','58783511','58783481','58783428',
+    '58783405','58783374','58783365','58783356','82294554','82294550','82294545','82294541',
+    '82294538','82294535','82294529','82294525','82294520','58783731','58783713','58783672',
+    '58783653','58783632','58783615','58783607','58783584','58783574','58091979','58091970',
+    '58091959','58091941','58091933','58091919','58091908','58091901','58091642','58091616',
+    '58091610','58091596','58091591','58091566','58091538','58091504','58091398','58091389',
+    '82294558','58783945','58783941','58783928','58783858','58783848','58783824','58783779',
+    '58093084','58093070','58093062','58093048','58093036','58093031','58093013','58093001',
+    '58092530','58092384','58092337','58092331','58092311','58092270','58092250','58092230',
+    '58092222','58092195','58092186','58092121','58092014','58092004','58784141','58784132',
+    '58784124','58784116','58784105','58784100','58784091','58784088','58784080','58784070',
+    '58093279','58093268','58093248','58093239','58093229','58093213','58093209','58093196',
+    '58093188','58093177','58093173','58093155','58093147','58093137','58093112','58093104',
+    '58093092','58784220','58784188','58784184','58784162','58784160','58784152','58784148',
+    '58093472','58093464','58093456','58093450','58093432','58093421','58093418','58093414',
+    '58093408','58093400','58093397','58093391','58093381','58093375','58093370','58093366',
+    '58093363','58093360','58093354','58093349','58093320','58093286','59960582','59960550',
+    '59960514','59960484','59960454','59960409','59960299','59960269','58784225','64291989',
+    '64291988','64291985','64291981','64291977','64291975','62295323','62295303','62295300',
+    '62295290','62295241','62295239','62295238','58093590','58093580','58093566','58093555',
+    '58093549','58093538','58093493','65688305','65688295','65688273','59960698','59960652',
+    '59960618','41395173','41395145','41395118','64292139','64292135','64292087','64292085',
+    '64292077','64292072','64292064','64292056','64292050','64292043','64292038','64292034',
+    '64292028','64292025','64292017','64292011','64292007','64292005','64292000','65688440',
+    '65688406','65688401','65688391','65688368','65688349','65688339','65688319','46235749',
+    '46235720','46235715','46234821','46234279','43775809','43775760','43775739','41397102',
+    '41395874','41395852','41395846','41395844','41395841','41395490','41395480','41395460',
+  ];
+  const [accountSel, setAccountSel]     = useState(INITIAL_IDS);
+  const [accountExcl, setAccountExcl]   = useState(false);
+  const INITIAL_META = Object.fromEntries(INITIAL_IDS.map(id => [id, 'exact']));
+
+  /* 单 Tab 示例（子渠道标识，带后端校验） */
+  const [channelSel, setChannelSel]     = useState([]);
+  const [channelExcl, setChannelExcl]   = useState(false);
+
+
+  const accountTabs = [
+    { key: 'id',   label: '账户ID',   placeholder: '输入账户ID' },
+    { key: 'name', label: '账户名称', placeholder: '输入账户名称' },
+  ];
+
+  const subChannelTabs = [
+    { key: 'sub', label: '子渠道标识', placeholder: '输入子渠道标识' },
+  ];
+
+
+  return (
+    <div>
+      <div style={{ textAlign: 'center', marginBottom: 36 }}>
+        <div style={{ fontSize: 22, fontWeight: 700, color: '#111', marginBottom: 6 }}>AccountInputChip</div>
+        <div style={{ fontSize: 13, color: '#999' }}>复合筛选器组件 — 直接输入查询 + 批量精确 / 模糊添加</div>
+      </div>
+
+      <div className="demo-card">
+        {/* 示例 1：多 Tab */}
+        <div className="demo-row">
+          <div className="demo-label">多 Tab<br /><span style={{color:'#bbb'}}>账户ID / 账户名称</span></div>
+          <AccountInputChip
+            tabs={accountTabs}
+            selected={accountSel}
+            onChange={setAccountSel}
+            exclude={accountExcl}
+            onExcludeChange={setAccountExcl}
+            onValidate={accountValidate}
+            onTabChange={setAccountTabIdx}
+            initialValueMeta={INITIAL_META}
+          />
+        </div>
+
+        {/* 示例 2：单 Tab + 精确校验 */}
+        <div className="demo-row">
+          <div className="demo-label">单 Tab + 精确校验<br /><span style={{color:'#bbb'}}>子渠道标识</span></div>
+          <AccountInputChip
+            tabs={subChannelTabs}
+            selected={channelSel}
+            onChange={setChannelSel}
+            exclude={channelExcl}
+            onExcludeChange={setChannelExcl}
+            onValidate={mockValidate}
+          />
+        </div>
+
+
+        {/* 当前状态展示 */}
+        <div className="state-box">
+          <div><strong>账户：</strong>
+            exclude={String(accountExcl)} &nbsp;|&nbsp;
+            selected=[{accountSel.join(', ') || '—'}]
+            <span style={{color:'#bbb',marginLeft:8}}>
+              有效ID：34552853 / 34552852 / 34552846 / 34552839 / 34552837 &nbsp;|&nbsp; 有效名称：游酷盛世科技(北京)有限公司
+            </span>
+          </div>
+          <div><strong>子渠道：</strong>
+            exclude={String(channelExcl)} &nbsp;|&nbsp;
+            selected=[{channelSel.join(', ') || '—'}]
+            {channelSel.length === 0 && <span style={{color:'#bbb',marginLeft:8}}>可用有效值：btt00zyh041 ~ btt00zyh050</span>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

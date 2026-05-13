@@ -46,6 +46,7 @@ export function MultiSelectChip({
   const [mode, setMode]           = useState<'list' | 'batch'>('list');
   const [batchText, setBatchText] = useState('');
   const [matchMode, setMatchMode] = useState<MatchMode>('exact');
+  const [pendingItems, setPendingItems] = useState<{ value: string; valid: boolean }[]>([]);
   const [dropPos, setDropPos]     = useState<{ left: number; top: number } | null>(null);
   const [hovered, setHovered]     = useState(false);
 
@@ -56,11 +57,15 @@ export function MultiSelectChip({
   const btnRef        = useRef<HTMLButtonElement>(null);
   const searchRef     = useRef<HTMLInputElement>(null);
   const textareaRef   = useRef<HTMLTextAreaElement>(null);
+  const tagInputRef   = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
     if (mode === 'list')  setTimeout(() => searchRef.current?.focus(), 50);
-    if (mode === 'batch') setTimeout(() => textareaRef.current?.focus(), 50);
+    if (mode === 'batch') setTimeout(() => {
+      if (matchMode === 'exact') tagInputRef.current?.focus();
+      else textareaRef.current?.focus();
+    }, 50);
   }, [open, mode]);
 
   useEffect(() => {
@@ -82,6 +87,8 @@ export function MultiSelectChip({
     setSearch('');
     setTab('all');
     setMode('list');
+    setBatchText('');
+    setPendingItems([]);
   };
 
   const handleToggle = () => {
@@ -153,28 +160,51 @@ export function MultiSelectChip({
     setOpen(true);
   };
 
-  const batchTokens    = useMemo(() => parseTokens(batchText), [batchText]);
-  const exactMatched   = useMemo(() => batchTokens.filter(t => optionSet.has(t)),  [batchTokens, optionSet]);
-  const exactUnmatched = useMemo(() => batchTokens.filter(t => !optionSet.has(t)), [batchTokens, optionSet]);
+  const batchTokens = useMemo(() => parseTokens(batchText), [batchText]);
 
-  const handleBatchConfirm = () => {
+  // 精确模式：Enter 校验，转为 pending chips
+  const commitExactValidate = () => {
     if (batchTokens.length === 0) return;
+    const existingValues = new Set(pendingItems.map(p => p.value));
+    const newItems = batchTokens
+      .filter(t => !existingValues.has(t))
+      .map(t => ({ value: t, valid: optionSet.has(t) }));
+    setPendingItems(prev => [...prev, ...newItems]);
+    setBatchText('');
+    tagInputRef.current?.focus();
+  };
+
+  const handleBatchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') { e.preventDefault(); commitExactValidate(); }
+  };
+
+  // 精确模式：把有效 chips 加入已选
+  const handlePendingConfirm = () => {
+    const validValues = pendingItems.filter(p => p.valid).map(p => p.value);
+    if (validValues.length === 0) return;
+    onChange(Array.from(new Set([...selected, ...validValues])));
+    setPendingItems([]);
+    setMode('list');
+    setTab('selected');
+    setOpen(true);
+  };
+
+  // 模糊模式：直接追加
+  const handleBatchConfirm = () => {
     if (matchMode === 'exact') {
-      if (exactMatched.length === 0) return;
-      const merged = Array.from(new Set([...selected, ...exactMatched]));
-      onChange(merged);
+      commitExactValidate();
     } else {
+      if (batchTokens.length === 0) return;
       const merged = Array.from(new Set([...selected, ...batchTokens]));
       onChange(merged);
       const newMeta: Record<string, CustomKind> = {};
       batchTokens.forEach(t => { newMeta[t] = 'fuzzy'; });
       setCustomMeta(prev => ({ ...prev, ...newMeta }));
+      setBatchText('');
+      setMode('list');
+      setTab('selected');
+      setOpen(true);
     }
-
-    setBatchText('');
-    setMode('list');
-    setTab('selected');
-    setOpen(true);
   };
 
   const hasSelection = selected.length > 0;
@@ -521,7 +551,7 @@ export function MultiSelectChip({
               <Segmented
                 size="small"
                 value={matchMode}
-                onChange={v => setMatchMode(v as MatchMode)}
+                onChange={v => { setMatchMode(v as MatchMode); setPendingItems([]); setBatchText(''); }}
                 options={[
                   { label: '精确', value: 'exact' },
                   { label: '模糊', value: 'fuzzy' },
@@ -531,72 +561,63 @@ export function MultiSelectChip({
               />
             </div>
 
-            {/* Hint bar */}
-            <div style={{
-              padding: '5px 12px',
-              fontSize: 12,
-              color: matchMode === 'fuzzy' ? '#7c4dff' : '#999',
-              background: matchMode === 'fuzzy' ? '#f3f0ff' : '#fafafa',
-              borderBottom: '1px solid #f0f0f0',
-              transition: 'all 0.15s',
-            }}>
-              {matchMode === 'exact'
-                ? '仅追加与选项列表精确匹配的值，未命中的将被忽略'
-                : '每个关键字追加后执行包含匹配（LIKE %keyword%），支持自定义值'}
-            </div>
-
-            {/* Textarea */}
+            {/* 输入区：精确模式为 tag input，模糊模式为 textarea */}
             <div style={{ padding: '10px 12px 0' }}>
-              <Input.TextArea
-                ref={textareaRef as React.Ref<any>}
-                value={batchText}
-                onChange={e => setBatchText(e.target.value)}
-                placeholder={'每行一个，或用逗号、空格分隔\n例：张磊, 李明\n王芳'}
-                style={{
-                  fontSize: 12, color: '#333',
-                  resize: 'none', lineHeight: 1.7,
-                  background: '#fafafa',
-                  minHeight: 120,
-                }}
-              />
+              {matchMode === 'exact' ? (
+                <div
+                  onClick={() => tagInputRef.current?.focus()}
+                  style={{
+                    minHeight: 120, maxHeight: 200, overflowY: 'auto',
+                    border: '1px solid #d9d9d9', borderRadius: 6,
+                    background: '#fafafa', padding: '6px 8px',
+                    display: 'flex', flexWrap: 'wrap', alignContent: 'flex-start',
+                    gap: 6, cursor: 'text',
+                  }}
+                >
+                  {pendingItems.map(item => (
+                    <span key={item.value} style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 3,
+                      padding: '1px 7px', borderRadius: 4, fontSize: 12,
+                      background: item.valid ? '#e6f4ff' : '#f5f5f5',
+                      color: item.valid ? '#1677ff' : '#bfbfbf',
+                      border: `1px solid ${item.valid ? '#91caff' : '#d9d9d9'}`,
+                      lineHeight: '20px', flexShrink: 0,
+                    }}>
+                      {item.value}
+                      {!item.valid && <span style={{ fontSize: 11, color: '#bfbfbf' }}>(无效)</span>}
+                      <span
+                        onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setPendingItems(prev => prev.filter(p => p.value !== item.value)); }}
+                        style={{ cursor: 'pointer', fontSize: 13, lineHeight: 1, color: item.valid ? '#91caff' : '#d9d9d9', marginLeft: 1 }}
+                        onMouseEnter={e => (e.currentTarget as HTMLSpanElement).style.color = item.valid ? '#1677ff' : '#999'}
+                        onMouseLeave={e => (e.currentTarget as HTMLSpanElement).style.color = item.valid ? '#91caff' : '#d9d9d9'}
+                      >×</span>
+                    </span>
+                  ))}
+                  <input
+                    ref={tagInputRef}
+                    value={batchText}
+                    onChange={e => setBatchText(e.target.value)}
+                    onKeyDown={handleBatchKeyDown}
+                    placeholder={pendingItems.length === 0 ? '输入后按回车校验，支持逗号、空格分隔' : '继续输入…'}
+                    style={{
+                      border: 'none', outline: 'none', background: 'transparent',
+                      fontSize: 12, color: '#333', lineHeight: '24px',
+                      minWidth: 160, flex: 1,
+                    }}
+                  />
+                </div>
+              ) : (
+                <Input.TextArea
+                  ref={textareaRef as React.Ref<any>}
+                  value={batchText}
+                  onChange={e => setBatchText(e.target.value)}
+                  placeholder={'每行一个，或用逗号、空格分隔\n例：张磊, 李明\n王芳'}
+                  style={{ fontSize: 12, color: '#333', resize: 'none', lineHeight: 1.7, background: '#fafafa', minHeight: 120 }}
+                />
+              )}
             </div>
 
-            {/* Exact mode: match status */}
-            {matchMode === 'exact' && batchTokens.length > 0 && (
-              <div style={{ padding: '7px 13px 4px', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {exactMatched.length > 0 && (
-                  <div style={{ fontSize: 12, color: '#52c41a', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span>✓ 精确匹配 {exactMatched.length} 项：</span>
-                    <span style={{
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      color: '#389e0d', maxWidth: 140,
-                    }}>
-                      {exactMatched.join('、')}
-                    </span>
-                  </div>
-                )}
-                {exactUnmatched.length > 0 && (
-                  <div style={{ fontSize: 12, color: '#bbb', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Tag style={{ fontSize: 11, lineHeight: '16px', padding: '0 5px', flexShrink: 0 }}>
-                      已忽略 {exactUnmatched.length} 项
-                    </Tag>
-                    <span style={{
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      maxWidth: 150,
-                    }}>
-                      {exactUnmatched.join('、')}
-                    </span>
-                  </div>
-                )}
-                {exactMatched.length === 0 && (
-                  <div style={{ fontSize: 12, color: '#ff4d4f' }}>
-                    ✕ 所有值均未在选项中找到，无法追加
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Fuzzy mode: all tokens info */}
+            {/* 模糊模式提示 */}
             {matchMode === 'fuzzy' && batchTokens.length > 0 && (
               <div style={{ padding: '7px 13px 4px' }}>
                 <div style={{ fontSize: 12, color: '#7c4dff', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
@@ -607,25 +628,30 @@ export function MultiSelectChip({
               </div>
             )}
 
-            {/* Confirm button */}
+            {/* 确认按钮 */}
             <div style={{ padding: '10px 12px 12px' }}>
-              <Button
-                block
-                type="primary"
-                disabled={matchMode === 'exact' ? exactMatched.length === 0 : batchTokens.length === 0}
-                onClick={handleBatchConfirm}
-                style={matchMode === 'fuzzy' && batchTokens.length > 0
-                  ? { background: '#7c4dff', borderColor: '#7c4dff' }
-                  : undefined}
-              >
-                {matchMode === 'exact'
-                  ? exactMatched.length > 0
-                    ? `追加 ${exactMatched.length} 个匹配项`
-                    : batchTokens.length > 0 ? '无可追加项（未命中）' : '请输入内容'
-                  : batchTokens.length > 0
-                    ? `确认追加 ${batchTokens.length} 个关键字（模糊匹配）`
-                    : '请输入内容'}
-              </Button>
+              {matchMode === 'exact' ? (
+                batchTokens.length > 0 ? (
+                  <Button block onClick={commitExactValidate}>回车校验</Button>
+                ) : pendingItems.some(p => p.valid) ? (
+                  <Button block type="primary" onClick={handlePendingConfirm}>
+                    添加 {pendingItems.filter(p => p.valid).length} 个有效项
+                  </Button>
+                ) : (
+                  <Button block disabled>
+                    {pendingItems.length > 0 ? '无有效项可添加' : '请输入内容'}
+                  </Button>
+                )
+              ) : (
+                <Button
+                  block type="primary"
+                  disabled={batchTokens.length === 0}
+                  onClick={handleBatchConfirm}
+                  style={batchTokens.length > 0 ? { background: '#7c4dff', borderColor: '#7c4dff' } : undefined}
+                >
+                  {batchTokens.length > 0 ? `确认追加 ${batchTokens.length} 个关键字（模糊匹配）` : '请输入内容'}
+                </Button>
+              )}
             </div>
           </>)}
 

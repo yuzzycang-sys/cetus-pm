@@ -213,6 +213,19 @@ export function FilterBar({
 
               if (TEXT_INPUT_KEYS.has(key)) {
                 const isAccountKey = key === 'accountId';
+                const MOCK_VALID_CHANNELS = new Set([
+                  'btt00zyh050','btt00zyh049','btt00zyh048','btt00zyh047','btt00zyh046',
+                  'btt00zyh045','btt00zyh044','btt00zyh043','btt00zyh042','btt00zyh041',
+                ]);
+                const mockValidate = key === 'subChannel'
+                  ? async (values: string[]) => {
+                      await new Promise(r => setTimeout(r, 300));
+                      return {
+                        valid:   values.filter(v => MOCK_VALID_CHANNELS.has(v)),
+                        invalid: values.filter(v => !MOCK_VALID_CHANNELS.has(v)),
+                      };
+                    }
+                  : undefined;
                 return (
                   <div key={key} style={{ position: 'relative', opacity: isLocked ? 0.45 : 1 }}>
                     <AccountInputChip
@@ -225,6 +238,7 @@ export function FilterBar({
                           ? setAccountExclude(ex)
                           : setFilterExcludes(prev => ({ ...prev, [key]: ex }))
                       }
+                      onValidate={mockValidate}
                     />
                     {isLocked && (
                       <div onClick={e => { e.stopPropagation(); onChannelLockedClick?.(); }}
