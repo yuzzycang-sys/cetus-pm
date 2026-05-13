@@ -32,7 +32,6 @@ export function MultiSelectChip({
   const [batchText, setBatchText] = useState('');
   const [pendingItems, setPendingItems] = useState<{ value: string; valid: boolean }[]>([]);
   const [dropPos, setDropPos]     = useState<{ left: number; top: number } | null>(null);
-  const [hovered, setHovered]     = useState(false);
 
   const wrapRef       = useRef<HTMLDivElement>(null);
   const dropdownRef   = useRef<HTMLDivElement>(null);
@@ -197,8 +196,6 @@ export function MultiSelectChip({
     <div
       ref={wrapRef}
       style={{ position: 'relative', flexShrink: 0 }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
       {/* ── Trigger ── */}
       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 180, flexShrink: 0 }}>
@@ -221,7 +218,7 @@ export function MultiSelectChip({
           }}>
             {displayValue}
           </span>
-          {isActive && hovered ? (
+          {isActive ? (
             <span
               onClick={e => { e.stopPropagation(); handleClear(); }}
               style={{ flexShrink: 0, color: '#bbb', fontSize: 15, lineHeight: 1, display: 'flex', alignItems: 'center', cursor: 'pointer' }}
@@ -512,18 +509,18 @@ export function MultiSelectChip({
                   <span key={item.value} style={{
                     display: 'inline-flex', alignItems: 'center', gap: 3,
                     padding: '1px 7px', borderRadius: 4, fontSize: 12,
-                    background: item.valid ? '#e6f4ff' : '#f5f5f5',
-                    color: item.valid ? '#1677ff' : '#bfbfbf',
-                    border: `1px solid ${item.valid ? '#91caff' : '#d9d9d9'}`,
+                    background: item.valid ? '#f6ffed' : '#f5f5f5',
+                    color: item.valid ? '#52c41a' : '#bfbfbf',
+                    border: `1px solid ${item.valid ? '#b7eb8f' : '#d9d9d9'}`,
                     lineHeight: '20px', flexShrink: 0,
                   }}>
                     {item.value}
                     {!item.valid && <span style={{ fontSize: 11, color: '#bfbfbf' }}>(无效)</span>}
                     <span
                       onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setPendingItems(prev => prev.filter(p => p.value !== item.value)); }}
-                      style={{ cursor: 'pointer', fontSize: 13, lineHeight: 1, color: item.valid ? '#91caff' : '#d9d9d9', marginLeft: 1 }}
-                      onMouseEnter={e => (e.currentTarget as HTMLSpanElement).style.color = item.valid ? '#1677ff' : '#999'}
-                      onMouseLeave={e => (e.currentTarget as HTMLSpanElement).style.color = item.valid ? '#91caff' : '#d9d9d9'}
+                      style={{ cursor: 'pointer', fontSize: 13, lineHeight: 1, color: item.valid ? '#b7eb8f' : '#d9d9d9', marginLeft: 1 }}
+                      onMouseEnter={e => (e.currentTarget as HTMLSpanElement).style.color = item.valid ? '#52c41a' : '#999'}
+                      onMouseLeave={e => (e.currentTarget as HTMLSpanElement).style.color = item.valid ? '#b7eb8f' : '#d9d9d9'}
                     >×</span>
                   </span>
                 ))}

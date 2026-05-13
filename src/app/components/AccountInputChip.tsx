@@ -97,7 +97,8 @@ export function AccountInputChip({
     setPanelInput('');
     if (plusBtnRef.current) {
       const r = plusBtnRef.current.getBoundingClientRect();
-      setDropPos({ left: r.right - 380, top: r.bottom + 6 });
+      const inputLeft = inlineRef.current?.getBoundingClientRect().left ?? r.right - 380;
+      setDropPos({ left: inputLeft, top: r.bottom + 6 });
     }
     setOpen(true);
     setTimeout(() => panelInputRef.current?.focus(), 50);
@@ -221,34 +222,63 @@ export function AccountInputChip({
                 )}
               </>
             )}
-            <input
-              ref={inlineRef}
-              value={inlineText}
-              onChange={e => { setInlineText(e.target.value); }}
-              onFocus={handleInlineFocus}
-              placeholder={activeTab.placeholder}
-              style={{
-                width: 180, height: 28, fontSize: 13, padding: '0 26px 0 10px',
-                border: `1px solid ${exclude ? '#fa8c16' : '#e0e0e0'}`,
-                borderRight: 'none',
+            {/* exclude 且有选值时显示摘要（与 MultiSelectChip 一致） */}
+            {exclude && hasSelection && !inlineText ? (
+              <div style={{
+                width: 180, height: 28, display: 'flex', alignItems: 'center',
+                padding: '0 26px 0 10px',
+                border: '1px solid #e0e0e0', borderRight: 'none',
                 borderRadius: '6px 0 0 6px',
-                outline: 'none', background: exclude ? '#fff7e6' : '#fff',
-                color: '#333', transition: 'border-color 0.15s',
-              }}
-              onFocusCapture={e => (e.currentTarget.style.borderColor = exclude ? '#fa8c16' : '#1677ff')}
-              onBlur={e => (e.currentTarget.style.borderColor = exclude ? '#fa8c16' : '#e0e0e0')}
-            />
-            {(inlineText || hasSelection) && (
-              <span
-                onMouseDown={e => {
-                  e.preventDefault();
-                  if (inlineText) setInlineText('');
-                  else handleClear();
-                }}
-                style={{ position: 'absolute', right: 6, cursor: 'pointer', color: '#bbb', fontSize: 15, lineHeight: 1 }}
-                onMouseEnter={e => (e.currentTarget as HTMLSpanElement).style.color = '#999'}
-                onMouseLeave={e => (e.currentTarget as HTMLSpanElement).style.color = '#bbb'}
-              >×</span>
+                background: '#fff', cursor: 'default', position: 'relative',
+                overflow: 'hidden',
+              }}>
+                <span style={{
+                  fontSize: 13, color: '#fa8c16',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+                }}>
+                  {selected.length > 1
+                    ? `排除 ${selected[0]} 等${selected.length}项`
+                    : `排除 ${selected[0]}`}
+                </span>
+                <span
+                  onMouseDown={e => { e.preventDefault(); handleClear(); }}
+                  style={{ position: 'absolute', right: 6, cursor: 'pointer', color: '#bbb', fontSize: 15, lineHeight: 1 }}
+                  onMouseEnter={e => (e.currentTarget as HTMLSpanElement).style.color = '#999'}
+                  onMouseLeave={e => (e.currentTarget as HTMLSpanElement).style.color = '#bbb'}
+                >×</span>
+              </div>
+            ) : (
+              <>
+                <input
+                  ref={inlineRef}
+                  value={inlineText}
+                  onChange={e => { setInlineText(e.target.value); }}
+                  onFocus={handleInlineFocus}
+                  placeholder={activeTab.placeholder}
+                  style={{
+                    width: 180, height: 28, fontSize: 13, padding: '0 26px 0 10px',
+                    border: '1px solid #e0e0e0',
+                    borderRight: 'none',
+                    borderRadius: '6px 0 0 6px',
+                    outline: 'none', background: '#fff',
+                    color: '#333', transition: 'border-color 0.15s',
+                  }}
+                  onFocusCapture={e => (e.currentTarget.style.borderColor = '#1677ff')}
+                  onBlur={e => (e.currentTarget.style.borderColor = '#e0e0e0')}
+                />
+                {(inlineText || hasSelection) && (
+                  <span
+                    onMouseDown={e => {
+                      e.preventDefault();
+                      if (inlineText) setInlineText('');
+                      else handleClear();
+                    }}
+                    style={{ position: 'absolute', right: 6, cursor: 'pointer', color: '#bbb', fontSize: 15, lineHeight: 1 }}
+                    onMouseEnter={e => (e.currentTarget as HTMLSpanElement).style.color = '#999'}
+                    onMouseLeave={e => (e.currentTarget as HTMLSpanElement).style.color = '#bbb'}
+                  >×</span>
+                )}
+              </>
             )}
           </div>
 
@@ -259,11 +289,11 @@ export function AccountInputChip({
             title="批量录入"
             style={{
               width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: `1px solid ${exclude ? '#fa8c16' : plusActive ? '#1677ff' : '#e0e0e0'}`,
+              border: `1px solid ${plusActive ? '#1677ff' : '#e0e0e0'}`,
               borderRadius: '0 6px 6px 0',
-              background: exclude ? '#fff7e6' : plusActive ? '#e6f4ff' : '#fff',
+              background: plusActive ? '#e6f4ff' : '#fff',
               cursor: 'pointer', fontSize: 18, fontWeight: 300,
-              color: exclude ? '#fa8c16' : plusActive ? '#1677ff' : '#999',
+              color: plusActive ? '#1677ff' : '#999',
               outline: 'none', transition: 'all 0.15s',
             }}
             onMouseEnter={e => { if (!open && !exclude && !selected.length) { (e.currentTarget as HTMLButtonElement).style.borderColor = '#1677ff'; (e.currentTarget as HTMLButtonElement).style.color = '#1677ff'; } }}
