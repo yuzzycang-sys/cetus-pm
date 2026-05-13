@@ -71,8 +71,8 @@
 <div id="root"></div>
 
 <script type="text/babel" data-presets="react">
-const { useState, useRef, useEffect, useMemo } = React;
-const { Button, Checkbox, Segmented, Spin } = antd;
+const { useState, useRef, useEffect } = React;
+const { Button, Checkbox } = antd;
 
 /* ─── 工具函数 ─── */
 function parseTokens(raw) {
@@ -83,19 +83,19 @@ function parseTokens(raw) {
 function AccountInputChip({
   selected, onChange, exclude, onExcludeChange,
   entityLabel = '账号', idLabel = 'ID', tabs: tabsProp,
-  onValidate, onTabChange, initialValueMeta,
+  onTabChange, onValidate,
+  supportFuzzy = false, matchMode: matchModeProp, onMatchModeChange,
+  hideExclude = false,
 }) {
   const [open, setOpen]               = useState(false);
   const [activeTabIdx, setActiveTabIdx] = useState(0);
-  const [matchMode, setMatchMode]     = useState('exact');
-  const [inputText, setInputText]     = useState('');
-  const [pendingItems, setPendingItems] = useState([]);
   const [dropPos, setDropPos]         = useState(null);
   const [hovered, setHovered]         = useState(false);
-  const [valueMeta, setValueMeta]     = useState(initialValueMeta ?? {});
   const [inlineText, setInlineText]   = useState('');
   const [tabDropOpen, setTabDropOpen] = useState(false);
-  const [inlineState] = useState('idle');
+  const [tempSelected, setTempSelected] = useState([]); // [{ value, valid: true|false|'pending' }]
+  const [panelInput, setPanelInput]   = useState('');
+  const [panelMatchMode, setPanelMatchMode] = useState(matchModeProp ?? 'exact');
 
   const resolvedTabs = tabsProp ?? [
     { key: 'id',   label: `${entityLabel}${idLabel}`,  placeholder: `输入${entityLabel}${idLabel}` },
@@ -103,22 +103,20 @@ function AccountInputChip({
   ];
   const activeTab = resolvedTabs[activeTabIdx] ?? resolvedTabs[0];
 
-  const wrapRef     = useRef(null);
-  const dropdownRef = useRef(null);
-  const plusBtnRef  = useRef(null);
-  const inlineRef   = useRef(null);
-  const tagInputRef = useRef(null);
+  const wrapRef      = useRef(null);
+  const dropdownRef  = useRef(null);
+  const plusBtnRef   = useRef(null);
+  const inlineRef    = useRef(null);
+  const panelInputRef = useRef(null);
 
-  useEffect(() => {
-    if (open) setTimeout(() => tagInputRef.current?.focus(), 50);
-  }, [open]);
+  const MAX_COUNT = 300;
 
   useEffect(() => {
     const handler = (e) => {
       const target = e.target;
       const inWrap = wrapRef.current?.contains(target) || dropdownRef.current?.contains(target);
       if (!inWrap) {
-        if (open) { setOpen(false); setInputText(''); }
+        if (open) setOpen(false);
         if (tabDropOpen) setTabDropOpen(false);
       }
     };
@@ -133,49 +131,25 @@ function AccountInputChip({
 
   useEffect(() => {
     if (inlineText.length === 0) return;
-    const hasBatchState = open || selectedRef.current.length > 0 || inputText.length > 0 || pendingItems.length > 0 || excludeRef.current;
+    const hasBatchState = open || selectedRef.current.length > 0 || excludeRef.current;
     if (!hasBatchState) return;
     setOpen(false);
-    setInputText('');
-    setPendingItems([]);
     onExcludeChange(false);
     onChange([]);
-    setValueMeta({});
   }, [inlineText]);
 
-  const handleInlineFocus = () => {
-    if (open) setOpen(false);
-  };
+  const handleInlineFocus = () => { if (open) setOpen(false); };
 
   const handlePlusClick = () => {
-    if (open) { setOpen(false); setInputText(''); return; }
+    if (open) { setOpen(false); return; }
+    setTempSelected(selected.map(v => ({ value: v, valid: true })));
+    setPanelInput('');
     if (plusBtnRef.current) {
       const r = plusBtnRef.current.getBoundingClientRect();
-      setDropPos({ left: r.right - 360, top: r.bottom + 4 });
+      setDropPos({ left: r.right - 380, top: r.bottom + 6 });
     }
     setOpen(true);
-  };
-
-  // 已选项减少时，把 overflow chip 按顺序转回 valid
-  useEffect(() => {
-    setPendingItems(prev => {
-      const overflows = prev.filter(p => p.status === 'overflow');
-      if (overflows.length === 0) return prev;
-      const remaining = MAX_COUNT - selected.length;
-      if (remaining <= 0) return prev;
-      const toRestore = new Set(overflows.slice(0, remaining).map(p => p.value));
-      return prev.map(p => toRestore.has(p.value) ? { ...p, status: 'valid' } : p);
-    });
-  }, [selected.length]);
-
-  const tokens = useMemo(() => parseTokens(inputText), [inputText]);
-
-  const switchMode = (m) => {
-    if (m === matchMode) return;
-    setMatchMode(m);
-    setPendingItems([]);
-    setInputText('');
-    tagInputRef.current?.focus();
+    setTimeout(() => panelInputRef.current?.focus(), 50);
   };
 
   const switchTab = (idx) => {
@@ -184,111 +158,57 @@ function AccountInputChip({
     onTabChange?.(idx);
     onChange([]);
     onExcludeChange(false);
-    setValueMeta({});
-    setInputText('');
-    setPendingItems([]);
+    setTempSelected([]);
   };
 
-  const handleKeyDown = async (e) => {
+  const handlePanelKeyDown = async (e) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
-    if (tokens.length === 0) return;
+    const existingValues = new Set(tempSelected.map(i => i.value));
+    const tokens = parseTokens(panelInput).filter(v => !existingValues.has(v));
+    if (tokens.length === 0) { setPanelInput(''); return; }
+    setPanelInput('');
 
-    const pendingValues = new Set(pendingItems.map(p => p.value));
-    const selectedValues = new Set(selected);
-    const duplicates = tokens.filter(t => pendingValues.has(t) || selectedValues.has(t));
-    const seen = new Set();
-    const freshTokens = tokens.filter(t => {
-      if (pendingValues.has(t) || selectedValues.has(t) || seen.has(t)) return false;
-      seen.add(t);
-      return true;
-    });
-    const duplicateItems = duplicates.map(t => ({ value: t, status: 'duplicate' }));
-
-    if (matchMode === 'exact' && onValidate && freshTokens.length > 0) {
-      setPendingItems(prev => [
-        ...prev,
-        ...duplicateItems,
-        ...freshTokens.map(t => ({ value: t, status: 'validating' })),
-      ]);
-      setInputText('');
-      try {
-        const { valid, invalid } = await onValidate(freshTokens);
-        const validSet = new Set(valid);
-        setPendingItems(prev =>
-          prev.map(p =>
-            freshTokens.includes(p.value)
-              ? { ...p, status: validSet.has(p.value) ? 'valid' : 'invalid' }
-              : p
-          )
-        );
-      } catch {
-        setPendingItems(prev =>
-          prev.map(p => freshTokens.includes(p.value) ? { ...p, status: 'invalid' } : p)
-        );
-      }
+    if (panelMatchMode === 'fuzzy' || !onValidate) {
+      setTempSelected(prev => [...prev, ...tokens.map(v => ({ value: v, valid: true }))]);
     } else {
-      setPendingItems(prev => [
-        ...prev,
-        ...duplicateItems,
-        ...freshTokens.map(t => ({ value: t, status: 'valid' })),
-      ]);
-      setInputText('');
+      setTempSelected(prev => [...prev, ...tokens.map(v => ({ value: v, valid: 'pending' }))]);
+      try {
+        const result = await onValidate(tokens);
+        const validSet = new Set(result.valid);
+        setTempSelected(prev => prev.map(item =>
+          tokens.includes(item.value) && item.valid === 'pending'
+            ? { value: item.value, valid: validSet.has(item.value) }
+            : item
+        ));
+      } catch {
+        setTempSelected(prev => prev.map(item =>
+          tokens.includes(item.value) && item.valid === 'pending'
+            ? { value: item.value, valid: false }
+            : item
+        ));
+      }
     }
-    tagInputRef.current?.focus();
   };
-
-  const MAX_COUNT = 300;
 
   const handleConfirm = () => {
-    const validItems = pendingItems.filter(p => p.status === 'valid').map(p => p.value);
-    if (validItems.length === 0) return;
-    const remaining  = MAX_COUNT - selected.length;
-    const newOnes    = validItems.filter(t => !selected.includes(t));
-    const toAdd      = newOnes.slice(0, remaining);
-    const keepPending = new Set(newOnes.slice(remaining));
-    if (toAdd.length > 0) {
-      onChange([...selected, ...toAdd]);
-      const meta = {};
-      toAdd.forEach(t => { meta[t] = matchMode; });
-      setValueMeta(prev => ({ ...prev, ...meta }));
-    }
-    setPendingItems(prev =>
-      prev
-        .filter(p => p.status !== 'valid' || keepPending.has(p.value))
-        .map(p => keepPending.has(p.value) ? { ...p, status: 'overflow' } : p)
-    );
-    setInlineText('');
-    tagInputRef.current?.focus();
+    const validValues = tempSelected.filter(i => i.valid === true).map(i => i.value);
+    onChange(validValues.slice(0, MAX_COUNT));
+    onMatchModeChange?.(panelMatchMode);
+    setInlineText(''); setOpen(false);
   };
-
-  const handleRemove = (v) => {
-    onChange(selected.filter(s => s !== v));
-    setValueMeta(prev => { const n = { ...prev }; delete n[v]; return n; });
+  const handleCancel  = () => setOpen(false);
+  const handleCopy    = () => {
+    const validValues = tempSelected.filter(i => i.valid === true).map(i => i.value);
+    navigator.clipboard.writeText(validValues.join('\n'));
   };
-
-  const handleClear = () => {
-    onChange([]);
-    onExcludeChange(false);
-    setValueMeta({});
-  };
+  const handleClear   = () => { onChange([]); onExcludeChange(false); };
 
   const hasSelection = selected.length > 0;
-  const subLabel = activeTab.label;
-  const isValidating   = pendingItems.some(p => p.status === 'validating');
-  const validCount     = pendingItems.filter(p => p.status === 'valid').length;
-  const hasValidPending = validCount > 0;
-
-  const chipStyle = (status) => {
-    if (status === 'valid')      return { bg: '#e6f4ff', color: '#1677ff', border: '#91caff' };
-    if (status === 'invalid')    return { bg: '#f5f5f5', color: '#bfbfbf', border: '#d9d9d9' };
-    if (status === 'duplicate')  return { bg: '#f5f5f5', color: '#bfbfbf', border: '#d9d9d9' };
-    if (status === 'overflow')   return { bg: '#fff2e8', color: '#d46b08', border: '#ffbb96' };
-    return { bg: '#fffbe6', color: '#d48806', border: '#ffe58f' };
-  };
-
-  const borderColor = exclude ? '#fa8c16' : '#e0e0e0';
-  const plusActive  = open || selected.length > 0;
+  const subLabel     = activeTab.label;
+  const plusActive   = open || selected.length > 0;
+  const validCount   = tempSelected.filter(i => i.valid === true).length;
+  const invalidCount = tempSelected.filter(i => i.valid === false).length;
 
   return (
     <div ref={wrapRef} style={{ position: 'relative', flexShrink: 0, display: 'inline-flex' }}
@@ -356,7 +276,7 @@ function AccountInputChip({
               onFocus={e => { handleInlineFocus(); e.currentTarget.style.borderColor = exclude ? '#fa8c16' : '#1677ff'; }}
               onBlur={e => e.currentTarget.style.borderColor = exclude ? '#fa8c16' : '#e0e0e0'}
             />
-            {hovered && (inlineText || hasSelection) && (
+            {(inlineText || hasSelection) && (
               <span
                 onMouseDown={e => {
                   e.preventDefault();
@@ -389,193 +309,164 @@ function AccountInputChip({
         </div>
       </div>
 
-      {/* 批量面板 */}
+      {/* 批量录入面板 */}
       {open && dropPos && (
-        <div
-          ref={dropdownRef}
-          style={{
-            position: 'fixed', left: dropPos.left, top: dropPos.top,
-            zIndex: 9999, background: '#fff', borderRadius: 8,
-            border: '1px solid #e8e8e8', boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
-            width: 360,
-            maxHeight: `calc(100vh - ${dropPos.top + 16}px)`,
-            overflowY: 'auto',
-          }}
-        >
-          {/* 顶栏 */}
-          <div style={{
-            display: 'flex', alignItems: 'center',
-            borderBottom: '1px solid #f0f0f0', padding: '0 12px',
-            position: 'sticky', top: 0, background: '#fff', zIndex: 1,
-          }}>
-            <div style={{ display: 'flex', flex: 1 }}>
-              {resolvedTabs.length > 1 ? resolvedTabs.map((tab, idx) => {
-                const active = idx === activeTabIdx;
-                return (
-                  <div key={tab.key} onClick={() => switchTab(idx)} style={{
-                    padding: '8px 10px 7px', fontSize: 13, cursor: 'pointer',
-                    color: active ? '#1890ff' : '#555',
-                    borderBottom: active ? '2px solid #1890ff' : '2px solid transparent',
-                    fontWeight: active ? 500 : 400,
-                    marginBottom: -1, userSelect: 'none',
-                  }}>{tab.label}</div>
-                );
-              }) : (
-                <div style={{ padding: '8px 10px 7px', fontSize: 13, color: '#333' }}>{resolvedTabs[0].label}</div>
-              )}
-            </div>
-            <style>{`
-              .ac-seg .ant-segmented-item { font-size: 12px !important; }
-              .ac-seg .ant-segmented-item-selected { color: #1677ff !important; }
-            `}</style>
-            <Segmented
-              size="small"
-              value={matchMode}
-              onChange={v => switchMode(v)}
-              options={[{ label: '精确', value: 'exact' }, { label: '模糊', value: 'fuzzy' }]}
-              className="ac-seg"
-              style={{ flexShrink: 0 }}
-            />
+        <div ref={dropdownRef} style={{
+          position: 'fixed', left: dropPos.left, top: dropPos.top,
+          zIndex: 9999, background: '#fff', borderRadius: 10,
+          border: '1px solid #e8e8e8', boxShadow: '0 6px 20px rgba(0,0,0,0.12)',
+          width: 380, padding: '14px 18px 14px',
+        }}>
+          {/* 标题：tab 名称 + × */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#111' }}>{activeTab.label}</span>
+            <span onMouseDown={e => { e.preventDefault(); handleCancel(); }}
+              style={{ cursor: 'pointer', color: '#bbb', fontSize: 20, lineHeight: 1 }}
+              onMouseEnter={e => e.currentTarget.style.color = '#999'}
+              onMouseLeave={e => e.currentTarget.style.color = '#bbb'}
+            >×</span>
           </div>
 
-          {/* Tag 输入区 */}
-          <div style={{ padding: '10px 12px 0' }}>
-            <div style={{ position: 'relative' }}>
-            {pendingItems.length > 0 && (
-              <span
-                onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setPendingItems([]); setInputText(''); }}
-                style={{
-                  position: 'absolute', right: 8, top: 6, zIndex: 1,
-                  fontSize: 12, color: '#ff4d4f', cursor: 'pointer', userSelect: 'none',
-                }}
-                onMouseEnter={e => e.currentTarget.style.color = '#cf1322'}
-                onMouseLeave={e => e.currentTarget.style.color = '#ff4d4f'}
-              >清空</span>
-            )}
-            <div
-              onClick={() => tagInputRef.current?.focus()}
-              style={{
-                minHeight: 100, maxHeight: 180, overflowY: 'auto',
-                border: '1px solid #d9d9d9', borderRadius: 6,
-                background: '#fafafa', padding: '6px 8px',
-                display: 'flex', flexWrap: 'wrap', alignContent: 'flex-start',
-                gap: 6, cursor: 'text',
-              }}
-            >
-              {pendingItems.map(item => {
-                const c = chipStyle(item.status);
-                return (
-                  <span key={item.value} style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 3,
-                    padding: '1px 7px', borderRadius: 4, fontSize: 12,
-                    background: c.bg, color: c.color, border: `1px solid ${c.border}`,
-                    lineHeight: '20px', flexShrink: 0,
-                  }}>
-                    {item.status === 'validating' && <Spin size="small" style={{ marginRight: 2 }} />}
-                    {item.value}
-                    {item.status === 'invalid'   && <span style={{ fontSize: 11, color: '#bfbfbf' }}>(无效)</span>}
-                    {item.status === 'duplicate' && <span style={{ fontSize: 11, color: '#bfbfbf' }}>(重复)</span>}
-                    {item.status === 'overflow'  && <span style={{ fontSize: 11, color: '#d46b08' }}>(已达上限)</span>}
-                    {item.status !== 'validating' && (
+          {/* 模式切换（仅 supportFuzzy 时展示）*/}
+          {supportFuzzy && (
+            <div style={{ display: 'flex', marginBottom: 10, borderRadius: 6, overflow: 'hidden', border: '1px solid #e0e0e0', width: 'fit-content' }}>
+              {['exact', 'fuzzy'].map(mode => (
+                <div
+                  key={mode}
+                  onMouseDown={e => {
+                    e.preventDefault();
+                    if (mode === panelMatchMode) return;
+                    setPanelMatchMode(mode);
+                    setTempSelected([]);
+                    setPanelInput('');
+                  }}
+                  style={{
+                    padding: '3px 14px', fontSize: 12, cursor: 'pointer', userSelect: 'none',
+                    background: panelMatchMode === mode ? '#1677ff' : '#fff',
+                    color: panelMatchMode === mode ? '#fff' : '#555',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {mode === 'exact' ? '精准匹配' : '模糊匹配'}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 计数+复制（左）+ 提示（右）同行 */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              <span style={{ fontSize: 12, color: '#555' }}>已选({validCount}/{MAX_COUNT})</span>
+              {validCount > 0 && (
+                <span onMouseDown={e => { e.preventDefault(); handleCopy(); }}
+                  style={{ fontSize: 12, color: '#1677ff', cursor: 'pointer' }}>复制</span>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: panelMatchMode === 'fuzzy' ? '#fa8c16' : '#ff4d4f', flexShrink: 0 }}>
+              <span>ⓘ</span>
+              <span>{panelMatchMode === 'fuzzy' ? '模糊匹配' : '精准匹配'}</span>
+            </div>
+          </div>
+
+          {/* chip 输入区（有错误时边框变红）*/}
+          <div style={{
+            border: `1px solid ${invalidCount > 0 ? '#ff7875' : '#d9d9d9'}`,
+            borderRadius: 6, display: 'flex', flexDirection: 'column',
+            transition: 'border-color 0.2s',
+          }}>
+            <div onClick={() => panelInputRef.current?.focus()} style={{
+              padding: '8px 10px 6px', minHeight: 120, maxHeight: 200,
+              overflowY: 'auto', cursor: 'text',
+            }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: tempSelected.length > 0 ? 6 : 0 }}>
+                {tempSelected.map(item => {
+                  const isInvalid = item.valid === false;
+                  const isPending = item.valid === 'pending';
+                  return (
+                    <span key={item.value} style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 3,
+                      padding: '1px 7px', borderRadius: 3, fontSize: 12, flexShrink: 0,
+                      background: isInvalid ? '#fff1f0' : '#f6ffed',
+                      color: isInvalid ? '#ff4d4f' : '#52c41a',
+                      border: `1px solid ${isInvalid ? '#ffa39e' : '#b7eb8f'}`,
+                      opacity: isPending ? 0.5 : 1,
+                    }}>
+                      {item.value}{isInvalid ? `（${entityLabel}不存在或不可访问）` : ''}
                       <span
-                        onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setPendingItems(prev => prev.filter(p => p.value !== item.value)); }}
-                        style={{ cursor: 'pointer', fontSize: 13, lineHeight: 1, color: c.border, marginLeft: 1 }}
-                        onMouseEnter={e => e.currentTarget.style.color = c.color}
-                        onMouseLeave={e => e.currentTarget.style.color = c.border}
+                        onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setTempSelected(prev => prev.filter(x => x.value !== item.value)); }}
+                        style={{ cursor: 'pointer', fontSize: 12, lineHeight: 1, color: isInvalid ? '#ffa39e' : '#b7eb8f' }}
+                        onMouseEnter={e => e.currentTarget.style.color = isInvalid ? '#ff4d4f' : '#52c41a'}
+                        onMouseLeave={e => e.currentTarget.style.color = isInvalid ? '#ffa39e' : '#b7eb8f'}
                       >×</span>
-                    )}
-                  </span>
-                );
-              })}
+                    </span>
+                  );
+                })}
+              </div>
               <input
-                ref={tagInputRef}
-                value={inputText}
-                onChange={e => setInputText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={pendingItems.length === 0
-                  ? `${activeTab.placeholder}，支持逗号/空格分隔，回车${matchMode === 'exact' && onValidate ? '校验' : '确认'}`
-                  : '继续输入…'}
-                style={{
-                  border: 'none', outline: 'none', background: 'transparent',
-                  fontSize: 12, color: '#333', lineHeight: '24px',
-                  minWidth: 160, flex: 1,
-                }}
+                ref={panelInputRef}
+                value={panelInput}
+                onChange={e => setPanelInput(e.target.value)}
+                onKeyDown={handlePanelKeyDown}
+                placeholder={tempSelected.length === 0 ? '支持批量录入，请使用中英文逗号、换行符、空格进行分隔，按回车进行校验' : ''}
+                style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: 12, color: '#555', width: '100%' }}
               />
             </div>
-            </div>
-          </div>
-
-          {/* 确认按钮 */}
-          <div style={{ padding: '8px 12px 0' }}>
-            {selected.length >= MAX_COUNT ? (
-              <Button block disabled>已达 {MAX_COUNT} 项上限</Button>
-            ) : tokens.length > 0 ? (
-              <Button block onClick={() => handleKeyDown({ key: 'Enter', preventDefault: () => {} })}>
-                {matchMode === 'exact' && onValidate ? '回车校验' : '回车确认'}
-              </Button>
-            ) : isValidating ? (
-              <Button block disabled>校验中…</Button>
-            ) : hasValidPending ? (
-              <Button block type="primary" onClick={handleConfirm}
-                style={matchMode === 'fuzzy' ? { background: '#7c4dff', borderColor: '#7c4dff' } : undefined}>
-                {validCount > MAX_COUNT - selected.length
-                  ? `添加前 ${MAX_COUNT - selected.length} 个有效项`
-                  : `添加 ${validCount} 个有效项`}
-              </Button>
-            ) : pendingItems.length > 0 ? (
-              <Button block disabled>无有效项可添加</Button>
-            ) : (
-              <Button block disabled>请输入内容</Button>
-            )}
-          </div>
-
-          {/* 已选列表 */}
-          <div style={{ borderTop: '1px solid #f0f0f0', marginTop: 8 }}>
-            <div style={{ padding: '8px 14px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 12, color: '#999' }}>
-                已添加 {selected.length} / {MAX_COUNT} 项
-              </span>
-              {selected.length > 0 && (
-                <Button type="link" size="small" onClick={handleClear} style={{ fontSize: 12, padding: 0, height: 'auto' }}>清空</Button>
-              )}
-            </div>
-            {selected.length > 0 && (
-              <div style={{ maxHeight: 150, overflowY: 'auto', padding: '0 0 4px' }}>
-                {selected.map(v => (
-                  <div
-                    key={v}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 14px' }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#f5f5f5'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                  >
-                    <span style={{ flex: 1, fontSize: 12, color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</span>
-                    {valueMeta[v] && (
-                      <span style={{
-                        fontSize: 11, borderRadius: 3, padding: '0 4px', flexShrink: 0,
-                        ...(valueMeta[v] === 'fuzzy'
-                          ? { color: '#7c4dff', background: '#f3f0ff', border: '1px solid #d3adf7' }
-                          : { color: '#52c41a', background: '#f6ffed', border: '1px solid #b7eb8f' })
-                      }}>
-                        {valueMeta[v] === 'fuzzy' ? '模糊' : '精确'}
-                      </span>
-                    )}
-                    <span style={{ cursor: 'pointer', color: '#bbb', flexShrink: 0, fontSize: 13 }} onClick={() => handleRemove(v)}>✕</span>
-                  </div>
-                ))}
+            {/* 固定底栏：左侧回车提示 / 右侧操作+计数 */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '5px 10px', borderTop: '1px solid #f0f0f0',
+            }}>
+              {panelInput.length > 0
+                ? <span style={{ fontSize: 11, color: '#fa8c16' }}>输入完成后请按回车</span>
+                : <span />
+              }
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {invalidCount > 0 && (
+                  <span
+                    onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setTempSelected(prev => prev.filter(i => i.valid !== false)); }}
+                    style={{ fontSize: 11, color: '#ff4d4f', cursor: 'pointer', userSelect: 'none' }}
+                    onMouseEnter={e => e.currentTarget.style.color = '#cf1322'}
+                    onMouseLeave={e => e.currentTarget.style.color = '#ff4d4f'}
+                  >清空{invalidCount}个错误{activeTab.label}</span>
+                )}
+                {tempSelected.length > 0 && (
+                  <span
+                    onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setTempSelected([]); }}
+                    style={{ fontSize: 11, color: '#1677ff', cursor: 'pointer', userSelect: 'none' }}
+                    onMouseEnter={e => e.currentTarget.style.color = '#4096ff'}
+                    onMouseLeave={e => e.currentTarget.style.color = '#1677ff'}
+                  >清空全部</span>
+                )}
+                <span style={{ fontSize: 11, color: validCount > MAX_COUNT ? '#ff4d4f' : '#aaa' }}>
+                  {validCount}/{MAX_COUNT}
+                </span>
               </div>
-            )}
+            </div>
           </div>
 
-          {/* 排除 */}
-          <div style={{
-            display: 'flex', alignItems: 'center', padding: '7px 14px 10px',
-            borderTop: '1px solid #f0f0f0', background: '#fafafa',
-          }}>
-            <div onClick={() => onExcludeChange(!exclude)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}>
-              <Checkbox checked={exclude} style={{ pointerEvents: 'none' }} />
-              <span style={{ fontSize: 12, color: exclude ? '#fa8c16' : '#444' }}>排除</span>
+          {/* 框外警告 */}
+          {(invalidCount > 0 || validCount > MAX_COUNT) && (
+            <div style={{ fontSize: 11, color: '#ff4d4f', marginTop: 5, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {invalidCount > 0 && <span>存在错误{activeTab.label}，请检查输入的内容</span>}
+              {validCount > MAX_COUNT && <span>{activeTab.label}数量已超过最大限制（{MAX_COUNT}个），请删减多余项</span>}
             </div>
+          )}
+
+          {/* 排除（可隐藏）*/}
+          {!hideExclude && (
+            <div style={{ display: 'flex', alignItems: 'center', padding: '8px 0 2px' }}>
+              <div onClick={() => onExcludeChange(!exclude)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}>
+                <Checkbox checked={exclude} style={{ pointerEvents: 'none' }} />
+                <span style={{ fontSize: 12, color: exclude ? '#fa8c16' : '#444' }}>排除</span>
+              </div>
+            </div>
+          )}
+
+          {/* 底部按钮 */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
+            <Button size="small" onClick={handleCancel}>取消</Button>
+            <Button size="small" type="primary" disabled={invalidCount > 0 || validCount > MAX_COUNT} onClick={handleConfirm}>确定</Button>
           </div>
         </div>
       )}
@@ -598,8 +489,7 @@ async function mockValidate(values) {
 
 /* ─── Demo 容器 ─── */
 function App() {
-  /* 账户校验函数（按当前 Tab 区分） */
-  const [accountTabIdx, setAccountTabIdx] = useState(0);
+  /* 账户ID校验函数 */
   const VALID_ACCOUNT_ID = new Set([
     '34552834','65189120','34552860','34552853','34552852','34552846','34552839','34552837',
     '34552835','34552875','34552871','34552870','34552869','34552868','34552867','34552864',
@@ -652,13 +542,11 @@ function App() {
     '46235720','46235715','46234821','46234279','43775809','43775760','43775739','41397102',
     '41395874','41395852','41395846','41395844','41395841','41395490','41395480','41395460',
   ]);
-  const VALID_ACCOUNT_NAME = new Set(['游酷盛世科技(北京)有限公司']);
   async function accountValidate(values) {
     await new Promise(r => setTimeout(r, 400));
-    const validSet = accountTabIdx === 0 ? VALID_ACCOUNT_ID : VALID_ACCOUNT_NAME;
     return {
-      valid:   values.filter(v => validSet.has(v)),
-      invalid: values.filter(v => !validSet.has(v)),
+      valid:   values.filter(v => VALID_ACCOUNT_ID.has(v)),
+      invalid: values.filter(v => !VALID_ACCOUNT_ID.has(v)),
     };
   }
 
@@ -715,23 +603,59 @@ function App() {
     '46235720','46235715','46234821','46234279','43775809','43775760','43775739','41397102',
     '41395874','41395852','41395846','41395844','41395841','41395490','41395480','41395460',
   ];
-  const [accountSel, setAccountSel]     = useState(INITIAL_IDS);
-  const [accountExcl, setAccountExcl]   = useState(false);
-  const INITIAL_META = Object.fromEntries(INITIAL_IDS.map(id => [id, 'exact']));
+  const [accountSel, setAccountSel]   = useState(INITIAL_IDS);
+  const [accountExcl, setAccountExcl] = useState(false);
 
-  /* 单 Tab 示例（子渠道标识，带后端校验） */
-  const [channelSel, setChannelSel]     = useState([]);
-  const [channelExcl, setChannelExcl]   = useState(false);
+  /* 账户名称 — 精准 + 模糊 */
+  const VALID_ACCOUNT_NAME = new Set(['游酷盛世科技(北京)有限公司', '字节跳动有限公司', '腾讯科技（深圳）有限公司']);
+  async function accountNameValidate(values) {
+    await new Promise(r => setTimeout(r, 400));
+    return {
+      valid:   values.filter(v => VALID_ACCOUNT_NAME.has(v)),
+      invalid: values.filter(v => !VALID_ACCOUNT_NAME.has(v)),
+    };
+  }
+  const [nameSel, setNameSel]         = useState([]);
+  const [nameExcl, setNameExcl]       = useState(false);
+  const [nameMatchMode, setNameMatchMode] = useState('exact');
 
+  /* 素材名称 — 精准 + 模糊 */
+  const VALID_CREATIVE_NAME = new Set([
+    '红白回归福利-AI喜来宝-竖','红白回归福利-秦始皇-横','红白回归福利-秦始皇-竖',
+    '红白回归福利-AI雅典娜-横','红白回归福利-AI雅典娜-竖',
+    '鱼乐达人AI情怀服-情怀服男声2竖-竖','鱼乐达人AI情怀服-情怀服男声3竖-竖',
+    '冰钓测试-AI钓鱼测试2-竖','冰钓测试-AI钓鱼测试2-横',
+    '冰钓测试-AI钓鱼测试-竖','冰钓测试-AI钓鱼测试-横',
+    'SNK镇元斋-文字礼包码-横','SNK镇元斋-文字礼包码-竖',
+    'SNK麻宫雅典娜-文字礼包码-竖','SNK麻宫雅典娜-文字礼包码-横',
+    'Q2包装AI-AI济公割草开头-竖','Q2包装AI-AI济公割草开头-横',
+    'Q2包装AI-西方诸神混剪-横','Q2包装AI-西方诸神混剪-竖',
+    'Q2包装AI-西方诸神混剪2-横','Q2包装AI-西方诸神混剪2-竖',
+    '26Q2AI真人-单人后巷爆了爆了-横','26Q2AI真人-单人后巷爆了爆了-竖',
+    '26Q2AI真人-单人麻将馆爆了爆了-横',
+  ]);
+  async function creativeNameValidate(values) {
+    await new Promise(r => setTimeout(r, 400));
+    return {
+      valid:   values.filter(v => VALID_CREATIVE_NAME.has(v)),
+      invalid: values.filter(v => !VALID_CREATIVE_NAME.has(v)),
+    };
+  }
+  const [creativeSel, setCreativeSel]             = useState([]);
+  const [creativeMatchMode, setCreativeMatchMode] = useState('exact');
+  /* 排除素材名称 */
+  const [exCreativeSel, setExCreativeSel]         = useState([]);
+  const [exCreativeMatchMode, setExCreativeMatchMode] = useState('exact');
 
-  const accountTabs = [
-    { key: 'id',   label: '账户ID',   placeholder: '输入账户ID' },
-    { key: 'name', label: '账户名称', placeholder: '输入账户名称' },
-  ];
+  /* 子渠道标识 */
+  const [channelSel, setChannelSel]   = useState([]);
+  const [channelExcl, setChannelExcl] = useState(false);
 
-  const subChannelTabs = [
-    { key: 'sub', label: '子渠道标识', placeholder: '输入子渠道标识' },
-  ];
+  const accountTabs        = [{ key: 'id',         label: '账户ID',     placeholder: '输入账户ID' }];
+  const nameTabs           = [{ key: 'name',       label: '账户名称',   placeholder: '输入账户名称' }];
+  const creativeNameTabs   = [{ key: 'creative',   label: '素材名称',   placeholder: '输入素材名称' }];
+  const exCreativeNameTabs = [{ key: 'excreative', label: '排除素材名称', placeholder: '输入排除的素材名称' }];
+  const subChannelTabs     = [{ key: 'sub',        label: '子渠道标识', placeholder: '输入子渠道标识' }];
 
 
   return (
@@ -744,24 +668,77 @@ function App() {
       <div className="demo-card">
         {/* 示例 1：多 Tab */}
         <div className="demo-row">
-          <div className="demo-label">多 Tab<br /><span style={{color:'#bbb'}}>账户ID / 账户名称</span></div>
+          <div className="demo-label">账户ID</div>
           <AccountInputChip
             tabs={accountTabs}
+            entityLabel="账户"
             selected={accountSel}
             onChange={setAccountSel}
             exclude={accountExcl}
             onExcludeChange={setAccountExcl}
             onValidate={accountValidate}
-            onTabChange={setAccountTabIdx}
-            initialValueMeta={INITIAL_META}
           />
         </div>
 
-        {/* 示例 2：单 Tab + 精确校验 */}
+        {/* 示例 2：账户名称 — 精准 + 模糊 */}
         <div className="demo-row">
-          <div className="demo-label">单 Tab + 精确校验<br /><span style={{color:'#bbb'}}>子渠道标识</span></div>
+          <div className="demo-label">账户名称<br /><span style={{color:'#bbb'}}>精准 / 模糊</span></div>
+          <AccountInputChip
+            tabs={nameTabs}
+            entityLabel="账户"
+            selected={nameSel}
+            onChange={setNameSel}
+            exclude={nameExcl}
+            onExcludeChange={setNameExcl}
+            onValidate={accountNameValidate}
+            supportFuzzy={true}
+            matchMode={nameMatchMode}
+            onMatchModeChange={setNameMatchMode}
+          />
+        </div>
+
+        {/* 示例 3：素材名称 — 精准 + 模糊，无排除 */}
+        <div className="demo-row">
+          <div className="demo-label">素材名称<br /><span style={{color:'#bbb'}}>精准 / 模糊</span></div>
+          <AccountInputChip
+            tabs={creativeNameTabs}
+            entityLabel="素材"
+            selected={creativeSel}
+            onChange={setCreativeSel}
+            exclude={false}
+            onExcludeChange={() => {}}
+            onValidate={creativeNameValidate}
+            supportFuzzy={true}
+            matchMode={creativeMatchMode}
+            onMatchModeChange={setCreativeMatchMode}
+            hideExclude={true}
+          />
+        </div>
+
+        {/* 示例 4：排除素材名称 — 固定 exclude=true，精准 + 模糊 */}
+        <div className="demo-row">
+          <div className="demo-label">排除素材名称<br /><span style={{color:'#bbb'}}>精准 / 模糊</span></div>
+          <AccountInputChip
+            tabs={exCreativeNameTabs}
+            entityLabel="素材"
+            selected={exCreativeSel}
+            onChange={setExCreativeSel}
+            exclude={true}
+            onExcludeChange={() => {}}
+            onValidate={creativeNameValidate}
+            supportFuzzy={true}
+            matchMode={exCreativeMatchMode}
+            onMatchModeChange={setExCreativeMatchMode}
+            hideExclude={true}
+          />
+        </div>
+
+        {/* 示例 4：子渠道标识 */}
+        <div className="demo-row">
+          <div className="demo-label">子渠道标识</div>
           <AccountInputChip
             tabs={subChannelTabs}
+            entityLabel="子渠道"
             selected={channelSel}
             onChange={setChannelSel}
             exclude={channelExcl}
@@ -770,15 +747,25 @@ function App() {
           />
         </div>
 
-
         {/* 当前状态展示 */}
         <div className="state-box">
-          <div><strong>账户：</strong>
+          <div><strong>账户ID：</strong>
             exclude={String(accountExcl)} &nbsp;|&nbsp;
-            selected=[{accountSel.join(', ') || '—'}]
-            <span style={{color:'#bbb',marginLeft:8}}>
-              有效ID：34552853 / 34552852 / 34552846 / 34552839 / 34552837 &nbsp;|&nbsp; 有效名称：游酷盛世科技(北京)有限公司
-            </span>
+            selected=[{accountSel.slice(0,5).join(', ')}{accountSel.length > 5 ? `… +${accountSel.length - 5}` : ''}]
+          </div>
+          <div><strong>账户名称：</strong>
+            matchMode={nameMatchMode} &nbsp;|&nbsp; exclude={String(nameExcl)} &nbsp;|&nbsp;
+            selected=[{nameSel.join(', ') || '—'}]
+            {nameSel.length === 0 && <span style={{color:'#bbb',marginLeft:8}}>精准有效值：游酷盛世科技(北京)有限公司 等</span>}
+          </div>
+          <div><strong>素材名称：</strong>
+            matchMode={creativeMatchMode} &nbsp;|&nbsp;
+            selected=[{creativeSel.join('，') || '—'}]
+            {creativeSel.length === 0 && <span style={{color:'#bbb',marginLeft:8}}>精准有效值：红白回归福利-AI喜来宝-竖 等24条</span>}
+          </div>
+          <div><strong>排除素材名称：</strong>
+            matchMode={exCreativeMatchMode} &nbsp;|&nbsp;
+            selected=[{exCreativeSel.join('，') || '—'}]
           </div>
           <div><strong>子渠道：</strong>
             exclude={String(channelExcl)} &nbsp;|&nbsp;

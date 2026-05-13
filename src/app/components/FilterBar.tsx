@@ -11,37 +11,40 @@ import { AccountInputChip } from './AccountInputChip';
 import type { InputTab } from './AccountInputChip';
 // Keys that render as free-text multi-input (AccountInputChip) instead of dropdown
 const TEXT_INPUT_KEYS = new Set([
-  'accountId', 'projectId', 'adId',
-  'mediaCreativeId', 'mediaCreativeMd5', 'creativeName',
+  'accountId', 'accountName',
+  'projectId', 'projectName',
+  'adId', 'adName',
+  'mediaCreativeId', 'mediaCreativeName',
+  'mediaCreativeMd5',
+  'creativeName', 'excludeCreativeName',
   'subChannel',
 ]);
+
+// Keys that support fuzzy match toggle
+const FUZZY_SUPPORT_KEYS = new Set([
+  'accountName', 'projectName', 'adName',
+  'mediaCreativeName', 'creativeName', 'excludeCreativeName',
+]);
+
+// Keys where the exclude checkbox is hidden
+const HIDE_EXCLUDE_KEYS = new Set(['creativeName', 'excludeCreativeName']);
+
+// Keys that are permanently in exclude mode
+const ALWAYS_EXCLUDE_KEYS = new Set(['excludeCreativeName']);
+
 const TEXT_INPUT_TABS: Record<string, InputTab[]> = {
-  accountId:       [
-    { key: 'id',   label: '账户ID',       placeholder: '输入账户ID，支持多个' },
-    { key: 'name', label: '账户名称',     placeholder: '输入账户名称，支持多个' },
-  ],
-  projectId:       [
-    { key: 'id',   label: '项目ID',       placeholder: '输入项目ID，支持多个' },
-    { key: 'name', label: '项目名称',     placeholder: '输入项目名称，支持多个' },
-  ],
-  adId:            [
-    { key: 'id',   label: '广告ID',       placeholder: '输入广告ID，支持多个' },
-    { key: 'name', label: '广告名称',     placeholder: '输入广告名称，支持多个' },
-  ],
-  mediaCreativeId: [
-    { key: 'id',   label: '媒体素材ID',   placeholder: '输入媒体素材ID，支持多个' },
-    { key: 'name', label: '媒体素材名称', placeholder: '输入媒体素材名称，支持多个' },
-  ],
-  mediaCreativeMd5:[
-    { key: 'md5',  label: '媒体素材MD5',  placeholder: '输入媒体素材MD5，支持多个' },
-    { key: 'name', label: '媒体素材名称', placeholder: '输入媒体素材名称，支持多个' },
-  ],
-  creativeName:    [
-    { key: 'name', label: '素材名称',     placeholder: '输入素材名称，支持多个' },
-  ],
-  subChannel:      [
-    { key: 'id',   label: '子渠道标识',   placeholder: '输入子渠道标识，支持多个' },
-  ],
+  accountId:            [{ key: 'id',   label: '账户ID',       placeholder: '' }],
+  accountName:          [{ key: 'name', label: '账户名称',     placeholder: '' }],
+  projectId:            [{ key: 'id',   label: '项目ID',       placeholder: '' }],
+  projectName:          [{ key: 'name', label: '项目名称',     placeholder: '' }],
+  adId:                 [{ key: 'id',   label: '广告ID',       placeholder: '' }],
+  adName:               [{ key: 'name', label: '广告名称',     placeholder: '' }],
+  mediaCreativeId:      [{ key: 'id',   label: '媒体素材ID',   placeholder: '' }],
+  mediaCreativeName:    [{ key: 'name', label: '媒体素材名称', placeholder: '' }],
+  mediaCreativeMd5:     [{ key: 'md5',  label: '媒体素材MD5',  placeholder: '' }],
+  creativeName:         [{ key: 'name', label: '素材名称',     placeholder: '' }],
+  excludeCreativeName:  [{ key: 'name', label: '排除素材名称', placeholder: '' }],
+  subChannel:           [{ key: 'id',   label: '子渠道标识',   placeholder: '' }],
 };
 import { FILTER_CHIP_DATA } from './filterConfig';
 
@@ -76,8 +79,7 @@ export function FilterBar({
   const [showPriceRange, setShowPriceRange] = useState(false);
   const [priceRangePos, setPriceRangePos] = useState<{ left: number; top: number } | null>(null);
   const [filterExcludes, setFilterExcludes] = useState<Record<string, boolean>>({});
-  // 账号ID/名称 组件的 exclude 状态单独维护
-  const [accountExclude, setAccountExclude] = useState(false);
+  const [filterMatchModes, setFilterMatchModes] = useState<Record<string, 'exact' | 'fuzzy'>>({});
   const filterBtnRef = useRef<HTMLButtonElement>(null);
   const priceBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -144,15 +146,6 @@ export function FilterBar({
         />
       </div>
 
-      {/* ── 数据口径（永久，必填） ── */}
-      <MultiSelectChip
-        label="数据口径"
-        options={FILTER_CHIP_DATA['dataScope']?.options ?? []}
-        selected={filterSelections['dataScope'] || ['去刷号']}
-        onChange={sel => onFilterSelect('dataScope', sel.length ? sel : ['去刷号'])}
-        exclude={false}
-        onExcludeChange={() => {}}
-      />
 
       {/* ── Active filter chips（有竖分割线） ── */}
       {activeFilters.length > 0 && (
@@ -212,7 +205,6 @@ export function FilterBar({
               }
 
               if (TEXT_INPUT_KEYS.has(key)) {
-                const isAccountKey = key === 'accountId';
                 const MOCK_VALID_CHANNELS = new Set([
                   'btt00zyh050','btt00zyh049','btt00zyh048','btt00zyh047','btt00zyh046',
                   'btt00zyh045','btt00zyh044','btt00zyh043','btt00zyh042','btt00zyh041',
@@ -226,19 +218,25 @@ export function FilterBar({
                       };
                     }
                   : undefined;
+                const alwaysExclude = ALWAYS_EXCLUDE_KEYS.has(key);
+                const currentExclude = alwaysExclude ? true : !!filterExcludes[key];
                 return (
                   <div key={key} style={{ position: 'relative', opacity: isLocked ? 0.45 : 1 }}>
                     <AccountInputChip
                       tabs={TEXT_INPUT_TABS[key]}
                       selected={filterSelections[key] || []}
                       onChange={sel => onFilterSelect(key, sel)}
-                      exclude={isAccountKey ? accountExclude : !!filterExcludes[key]}
+                      exclude={currentExclude}
                       onExcludeChange={ex =>
-                        isAccountKey
-                          ? setAccountExclude(ex)
-                          : setFilterExcludes(prev => ({ ...prev, [key]: ex }))
+                        !alwaysExclude && setFilterExcludes(prev => ({ ...prev, [key]: ex }))
                       }
                       onValidate={mockValidate}
+                      supportFuzzy={FUZZY_SUPPORT_KEYS.has(key)}
+                      matchMode={filterMatchModes[key] ?? 'exact'}
+                      onMatchModeChange={mode =>
+                        setFilterMatchModes(prev => ({ ...prev, [key]: mode }))
+                      }
+                      hideExclude={HIDE_EXCLUDE_KEYS.has(key)}
                     />
                     {isLocked && (
                       <div onClick={e => { e.stopPropagation(); onChannelLockedClick?.(); }}

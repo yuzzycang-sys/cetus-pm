@@ -1,9 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Button, Checkbox, Input, Segmented, Tag } from 'antd';
+import { Button, Checkbox, Input, Tag } from 'antd';
 import { SearchOutlined, ArrowLeftOutlined } from '@ant-design/icons';
-
-type MatchMode = 'exact' | 'fuzzy';
-type CustomKind = 'exact' | 'fuzzy';
 
 interface Props {
   label: string;
@@ -23,18 +20,6 @@ function parseTokens(raw: string): string[] {
     .filter(Boolean);
 }
 
-function CustomBadge({ kind }: { kind: CustomKind | undefined }) {
-  if (!kind) return null;
-  return (
-    <Tag
-      style={{ marginInlineEnd: 0, marginLeft: 2, flexShrink: 0, fontSize: 11, lineHeight: '16px', padding: '0 5px' }}
-      color={kind === 'exact' ? 'success' : 'purple'}
-    >
-      {kind === 'exact' ? '精确' : '模糊'}
-    </Tag>
-  );
-}
-
 export function MultiSelectChip({
   label, options, optionAnnotations, selected, onChange, exclude, onExcludeChange,
   disabledValues = [],
@@ -45,27 +30,20 @@ export function MultiSelectChip({
   const [tab, setTab]             = useState<'all' | 'selected'>('all');
   const [mode, setMode]           = useState<'list' | 'batch'>('list');
   const [batchText, setBatchText] = useState('');
-  const [matchMode, setMatchMode] = useState<MatchMode>('exact');
   const [pendingItems, setPendingItems] = useState<{ value: string; valid: boolean }[]>([]);
   const [dropPos, setDropPos]     = useState<{ left: number; top: number } | null>(null);
   const [hovered, setHovered]     = useState(false);
-
-  const [customMeta, setCustomMeta] = useState<Record<string, CustomKind>>({});
 
   const wrapRef       = useRef<HTMLDivElement>(null);
   const dropdownRef   = useRef<HTMLDivElement>(null);
   const btnRef        = useRef<HTMLButtonElement>(null);
   const searchRef     = useRef<HTMLInputElement>(null);
-  const textareaRef   = useRef<HTMLTextAreaElement>(null);
   const tagInputRef   = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
     if (mode === 'list')  setTimeout(() => searchRef.current?.focus(), 50);
-    if (mode === 'batch') setTimeout(() => {
-      if (matchMode === 'exact') tagInputRef.current?.focus();
-      else textareaRef.current?.focus();
-    }, 50);
+    if (mode === 'batch') setTimeout(() => tagInputRef.current?.focus(), 50);
   }, [open, mode]);
 
   useEffect(() => {
@@ -115,13 +93,6 @@ export function MultiSelectChip({
   const toggleOption = (opt: string) => {
     if (selected.includes(opt)) {
       onChange(selected.filter(s => s !== opt));
-      if (customMeta[opt] !== undefined) {
-        setCustomMeta(prev => {
-          const next = { ...prev };
-          delete next[opt];
-          return next;
-        });
-      }
     } else {
       onChange([...selected, opt]);
     }
@@ -156,7 +127,6 @@ export function MultiSelectChip({
   const handleClear = () => {
     onChange([]);
     onExcludeChange(false);
-    setCustomMeta({});
     setOpen(true);
   };
 
@@ -178,7 +148,6 @@ export function MultiSelectChip({
     if (e.key === 'Enter') { e.preventDefault(); commitExactValidate(); }
   };
 
-  // 精确模式：把有效 chips 加入已选
   const handlePendingConfirm = () => {
     const validValues = pendingItems.filter(p => p.valid).map(p => p.value);
     if (validValues.length === 0) return;
@@ -187,24 +156,6 @@ export function MultiSelectChip({
     setMode('list');
     setTab('selected');
     setOpen(true);
-  };
-
-  // 模糊模式：直接追加
-  const handleBatchConfirm = () => {
-    if (matchMode === 'exact') {
-      commitExactValidate();
-    } else {
-      if (batchTokens.length === 0) return;
-      const merged = Array.from(new Set([...selected, ...batchTokens]));
-      onChange(merged);
-      const newMeta: Record<string, CustomKind> = {};
-      batchTokens.forEach(t => { newMeta[t] = 'fuzzy'; });
-      setCustomMeta(prev => ({ ...prev, ...newMeta }));
-      setBatchText('');
-      setMode('list');
-      setTab('selected');
-      setOpen(true);
-    }
   };
 
   const hasSelection = selected.length > 0;
@@ -236,7 +187,7 @@ export function MultiSelectChip({
   const selectAllDisabled = exclude;
   const excludeDisabled   = isAllSelected && !search && !exclude;
 
-  const customCount = selected.filter(s => isCustomValue(s)).length;
+  const customCount = selected.filter(s => isCustomValue(s) && !disabledSet.has(s)).length;
   const hasAnnotations = useMemo(
     () => options.some(o => !!optionAnnotations?.[o]?.col1 || !!optionAnnotations?.[o]?.col2),
     [options, optionAnnotations],
@@ -392,7 +343,6 @@ export function MultiSelectChip({
                 displayList.map(opt => {
                   const checked  = selected.includes(opt);
                   const isCustom = isCustomValue(opt);
-                  const kind     = customMeta[opt];
                   const isDisabled = disabledSet.has(opt);
 
                   return (
@@ -454,7 +404,11 @@ export function MultiSelectChip({
                         </>
                       )}
 
-                      {isCustom && <CustomBadge kind={kind} />}
+                      {isCustom && (
+                        <Tag style={{ marginInlineEnd: 0, marginLeft: 2, flexShrink: 0, fontSize: 11, lineHeight: '16px', padding: '0 5px' }} color="success">
+                          精确
+                        </Tag>
+                      )}
                     </div>
                   );
                 })
@@ -530,126 +484,75 @@ export function MultiSelectChip({
               display: 'flex', alignItems: 'center',
               padding: '9px 12px 8px',
               borderBottom: '1px solid #f0f0f0',
-              gap: 8,
             }}>
               <Button
                 type="link"
                 size="small"
                 icon={<ArrowLeftOutlined />}
                 onClick={() => setMode('list')}
-                style={{ padding: 0, height: 'auto', fontSize: 12, flexShrink: 0 }}
+                style={{ padding: 0, height: 'auto', fontSize: 12 }}
               >
                 返回
               </Button>
-              <div style={{ flex: 1 }} />
-              <span style={{ fontSize: 12, color: '#999', flexShrink: 0 }}>匹配方式</span>
-              <style>{`
-                .match-mode-seg .ant-segmented-item { font-weight: 400 !important; color: #8c8c8c; font-size: 12px !important; }
-                .match-mode-seg .ant-segmented-item-selected { font-weight: 400 !important; color: #1677ff !important; font-size: 12px !important; }
-                .match-mode-seg .ant-segmented-item-label { font-size: 12px !important; }
-              `}</style>
-              <Segmented
-                size="small"
-                value={matchMode}
-                onChange={v => { setMatchMode(v as MatchMode); setPendingItems([]); setBatchText(''); }}
-                options={[
-                  { label: '精确', value: 'exact' },
-                  { label: '模糊', value: 'fuzzy' },
-                ]}
-                className="match-mode-seg"
-                style={{ fontSize: 11 }}
-              />
             </div>
 
-            {/* 输入区：精确模式为 tag input，模糊模式为 textarea */}
+            {/* 输入区：tag input */}
             <div style={{ padding: '10px 12px 0' }}>
-              {matchMode === 'exact' ? (
-                <div
-                  onClick={() => tagInputRef.current?.focus()}
-                  style={{
-                    minHeight: 120, maxHeight: 200, overflowY: 'auto',
-                    border: '1px solid #d9d9d9', borderRadius: 6,
-                    background: '#fafafa', padding: '6px 8px',
-                    display: 'flex', flexWrap: 'wrap', alignContent: 'flex-start',
-                    gap: 6, cursor: 'text',
-                  }}
-                >
-                  {pendingItems.map(item => (
-                    <span key={item.value} style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 3,
-                      padding: '1px 7px', borderRadius: 4, fontSize: 12,
-                      background: item.valid ? '#e6f4ff' : '#f5f5f5',
-                      color: item.valid ? '#1677ff' : '#bfbfbf',
-                      border: `1px solid ${item.valid ? '#91caff' : '#d9d9d9'}`,
-                      lineHeight: '20px', flexShrink: 0,
-                    }}>
-                      {item.value}
-                      {!item.valid && <span style={{ fontSize: 11, color: '#bfbfbf' }}>(无效)</span>}
-                      <span
-                        onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setPendingItems(prev => prev.filter(p => p.value !== item.value)); }}
-                        style={{ cursor: 'pointer', fontSize: 13, lineHeight: 1, color: item.valid ? '#91caff' : '#d9d9d9', marginLeft: 1 }}
-                        onMouseEnter={e => (e.currentTarget as HTMLSpanElement).style.color = item.valid ? '#1677ff' : '#999'}
-                        onMouseLeave={e => (e.currentTarget as HTMLSpanElement).style.color = item.valid ? '#91caff' : '#d9d9d9'}
-                      >×</span>
-                    </span>
-                  ))}
-                  <input
-                    ref={tagInputRef}
-                    value={batchText}
-                    onChange={e => setBatchText(e.target.value)}
-                    onKeyDown={handleBatchKeyDown}
-                    placeholder={pendingItems.length === 0 ? '输入后按回车校验，支持逗号、空格分隔' : '继续输入…'}
-                    style={{
-                      border: 'none', outline: 'none', background: 'transparent',
-                      fontSize: 12, color: '#333', lineHeight: '24px',
-                      minWidth: 160, flex: 1,
-                    }}
-                  />
-                </div>
-              ) : (
-                <Input.TextArea
-                  ref={textareaRef as React.Ref<any>}
+              <div
+                onClick={() => tagInputRef.current?.focus()}
+                style={{
+                  minHeight: 120, maxHeight: 200, overflowY: 'auto',
+                  border: '1px solid #d9d9d9', borderRadius: 6,
+                  background: '#fafafa', padding: '6px 8px',
+                  display: 'flex', flexWrap: 'wrap', alignContent: 'flex-start',
+                  gap: 6, cursor: 'text',
+                }}
+              >
+                {pendingItems.map(item => (
+                  <span key={item.value} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 3,
+                    padding: '1px 7px', borderRadius: 4, fontSize: 12,
+                    background: item.valid ? '#e6f4ff' : '#f5f5f5',
+                    color: item.valid ? '#1677ff' : '#bfbfbf',
+                    border: `1px solid ${item.valid ? '#91caff' : '#d9d9d9'}`,
+                    lineHeight: '20px', flexShrink: 0,
+                  }}>
+                    {item.value}
+                    {!item.valid && <span style={{ fontSize: 11, color: '#bfbfbf' }}>(无效)</span>}
+                    <span
+                      onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setPendingItems(prev => prev.filter(p => p.value !== item.value)); }}
+                      style={{ cursor: 'pointer', fontSize: 13, lineHeight: 1, color: item.valid ? '#91caff' : '#d9d9d9', marginLeft: 1 }}
+                      onMouseEnter={e => (e.currentTarget as HTMLSpanElement).style.color = item.valid ? '#1677ff' : '#999'}
+                      onMouseLeave={e => (e.currentTarget as HTMLSpanElement).style.color = item.valid ? '#91caff' : '#d9d9d9'}
+                    >×</span>
+                  </span>
+                ))}
+                <input
+                  ref={tagInputRef}
                   value={batchText}
                   onChange={e => setBatchText(e.target.value)}
-                  placeholder={'每行一个，或用逗号、空格分隔\n例：张磊, 李明\n王芳'}
-                  style={{ fontSize: 12, color: '#333', resize: 'none', lineHeight: 1.7, background: '#fafafa', minHeight: 120 }}
+                  onKeyDown={handleBatchKeyDown}
+                  placeholder={pendingItems.length === 0 ? '输入后按回车校验，支持逗号、空格分隔' : '继续输入…'}
+                  style={{
+                    border: 'none', outline: 'none', background: 'transparent',
+                    fontSize: 12, color: '#333', lineHeight: '24px',
+                    minWidth: 160, flex: 1,
+                  }}
                 />
-              )}
-            </div>
-
-            {/* 模糊模式提示 */}
-            {matchMode === 'fuzzy' && batchTokens.length > 0 && (
-              <div style={{ padding: '7px 13px 4px' }}>
-                <div style={{ fontSize: 12, color: '#7c4dff', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                  <span>共 {batchTokens.length} 个关键字将以</span>
-                  <Tag color="purple" style={{ fontSize: 11, lineHeight: '16px', padding: '0 5px', margin: 0 }}>模糊</Tag>
-                  <span>自定义值追加到已选</span>
-                </div>
               </div>
-            )}
+            </div>
 
             {/* 确认按钮 */}
             <div style={{ padding: '10px 12px 12px' }}>
-              {matchMode === 'exact' ? (
-                batchTokens.length > 0 ? (
-                  <Button block onClick={commitExactValidate}>回车校验</Button>
-                ) : pendingItems.some(p => p.valid) ? (
-                  <Button block type="primary" onClick={handlePendingConfirm}>
-                    添加 {pendingItems.filter(p => p.valid).length} 个有效项
-                  </Button>
-                ) : (
-                  <Button block disabled>
-                    {pendingItems.length > 0 ? '无有效项可添加' : '请输入内容'}
-                  </Button>
-                )
+              {batchTokens.length > 0 ? (
+                <Button block onClick={commitExactValidate}>回车校验</Button>
+              ) : pendingItems.some(p => p.valid) ? (
+                <Button block type="primary" onClick={handlePendingConfirm}>
+                  添加 {pendingItems.filter(p => p.valid).length} 个有效项
+                </Button>
               ) : (
-                <Button
-                  block type="primary"
-                  disabled={batchTokens.length === 0}
-                  onClick={handleBatchConfirm}
-                  style={batchTokens.length > 0 ? { background: '#7c4dff', borderColor: '#7c4dff' } : undefined}
-                >
-                  {batchTokens.length > 0 ? `确认追加 ${batchTokens.length} 个关键字（模糊匹配）` : '请输入内容'}
+                <Button block disabled>
+                  {pendingItems.length > 0 ? '无有效项可添加' : '请输入内容'}
                 </Button>
               )}
             </div>

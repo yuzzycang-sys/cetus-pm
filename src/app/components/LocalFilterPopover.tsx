@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Button, Input, Typography, Checkbox, Segmented } from 'antd';
+import { Button, Input, Checkbox, Segmented } from 'antd';
 import { Info, Search, X, ChevronDown, ChevronUp, Check, ArrowLeft } from 'lucide-react';
 import { FILTER_GROUPS, FILTER_CHIP_DATA } from './filterConfig';
 import { DateRangeTrigger } from './DateRangePicker';
@@ -14,39 +14,42 @@ type MatchMode = 'exact' | 'fuzzy';
 
 // Keys that use text-input style panel instead of option-list panel
 const TEXT_INPUT_KEYS = new Set([
-  'accountId', 'projectId', 'adId', 'mediaCreativeId',
-  'mediaCreativeMd5', 'creativeName', 'subChannel',
+  'accountId', 'accountName',
+  'projectId', 'projectName',
+  'adId', 'adName',
+  'mediaCreativeId', 'mediaCreativeName',
+  'mediaCreativeMd5',
+  'creativeName', 'excludeCreativeName',
+  'subChannel',
 ]);
+
+// Keys that support fuzzy match toggle in text-input panel
+const FUZZY_SUPPORT_KEYS = new Set([
+  'accountName', 'projectName', 'adName',
+  'mediaCreativeName', 'creativeName', 'excludeCreativeName',
+]);
+
+// Keys where the exclude checkbox is hidden
+const HIDE_EXCLUDE_KEYS = new Set(['creativeName', 'excludeCreativeName']);
+
+// Keys that are permanently in exclude mode
+const ALWAYS_EXCLUDE_KEYS = new Set(['excludeCreativeName']);
 
 type SubTypeTab = { key: string; label: string; placeholder: string };
 
 const TEXT_INPUT_TABS: Record<string, SubTypeTab[]> = {
-  accountId:        [
-    { key: 'id',   label: '账户ID',     placeholder: '输入账户ID，支持多个' },
-    { key: 'name', label: '账户名称',   placeholder: '输入账户名称，支持多个' },
-  ],
-  projectId:        [
-    { key: 'id',   label: '项目ID',     placeholder: '输入项目ID，支持多个' },
-    { key: 'name', label: '项目名称',   placeholder: '输入项目名称，支持多个' },
-  ],
-  adId:             [
-    { key: 'id',   label: '广告ID',     placeholder: '输入广告ID，支持多个' },
-    { key: 'name', label: '广告名称',   placeholder: '输入广告名称，支持多个' },
-  ],
-  mediaCreativeId:  [
-    { key: 'id',   label: '媒体素材ID', placeholder: '输入媒体素材ID，支持多个' },
-    { key: 'name', label: '媒体素材名称', placeholder: '输入媒体素材名称，支持多个' },
-  ],
-  mediaCreativeMd5: [
-    { key: 'md5',  label: '媒体素材MD5', placeholder: '输入媒体素材MD5，支持多个' },
-    { key: 'name', label: '媒体素材名称', placeholder: '输入媒体素材名称，支持多个' },
-  ],
-  creativeName:     [
-    { key: 'name', label: '素材名称',   placeholder: '输入素材名称，支持多个' },
-  ],
-  subChannel:       [
-    { key: 'id',   label: '子渠道标识', placeholder: '输入子渠道标识，支持多个' },
-  ],
+  accountId:           [{ key: 'id',   label: '账户ID',       placeholder: '' }],
+  accountName:         [{ key: 'name', label: '账户名称',     placeholder: '' }],
+  projectId:           [{ key: 'id',   label: '项目ID',       placeholder: '' }],
+  projectName:         [{ key: 'name', label: '项目名称',     placeholder: '' }],
+  adId:                [{ key: 'id',   label: '广告ID',       placeholder: '' }],
+  adName:              [{ key: 'name', label: '广告名称',     placeholder: '' }],
+  mediaCreativeId:     [{ key: 'id',   label: '媒体素材ID',   placeholder: '' }],
+  mediaCreativeName:   [{ key: 'name', label: '媒体素材名称', placeholder: '' }],
+  mediaCreativeMd5:    [{ key: 'md5',  label: '媒体素材MD5',  placeholder: '' }],
+  creativeName:        [{ key: 'name', label: '素材名称',     placeholder: '' }],
+  excludeCreativeName: [{ key: 'name', label: '排除素材名称', placeholder: '' }],
+  subChannel:          [{ key: 'id',   label: '子渠道标识',   placeholder: '' }],
 };
 
 interface Props {
@@ -114,8 +117,6 @@ function ItemPanel({ label, options, selected, onChangeSelected, exclude, onExcl
   const [tab, setTab] = useState<'all' | 'selected'>('all');
   const [mode, setMode] = useState<'list' | 'batch'>('list');
   const [batchText, setBatchText] = useState('');
-  const [matchMode, setMatchMode] = useState<MatchMode>('exact');
-  const [customMeta, setCustomMeta] = useState<Record<string, MatchMode>>({});
 
   const searchRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -146,11 +147,7 @@ function ItemPanel({ label, options, selected, onChangeSelected, exclude, onExcl
 
   const toggleOption = (opt: string) => {
     if (selected.includes(opt)) {
-      const next = selected.filter(s => s !== opt);
-      onChangeSelected(next);
-      if (customMeta[opt] !== undefined) {
-        setCustomMeta(prev => { const n = { ...prev }; delete n[opt]; return n; });
-      }
+      onChangeSelected(selected.filter(s => s !== opt));
     } else {
       onChangeSelected([...selected, opt]);
     }
@@ -167,11 +164,6 @@ function ItemPanel({ label, options, selected, onChangeSelected, exclude, onExcl
     if (isAllSelected) {
       const fs = new Set(filteredOptions);
       onChangeSelected(selected.filter(s => !fs.has(s)));
-      setCustomMeta(prev => {
-        const n = { ...prev };
-        filteredOptions.forEach(o => delete n[o]);
-        return n;
-      });
     } else {
       onChangeSelected(Array.from(new Set([...selected, ...filteredOptions])));
     }
@@ -185,25 +177,16 @@ function ItemPanel({ label, options, selected, onChangeSelected, exclude, onExcl
   const handleClear = () => {
     onChangeSelected([]);
     onExcludeChange(false);
-    setCustomMeta({});
   };
 
-  // Batch mode
+  // Batch mode — exact only
   const batchTokens = useMemo(() => parseTokens(batchText), [batchText]);
   const exactMatched = useMemo(() => batchTokens.filter(t => optionSet.has(t)), [batchTokens, optionSet]);
   const exactUnmatched = useMemo(() => batchTokens.filter(t => !optionSet.has(t)), [batchTokens, optionSet]);
 
   const handleBatchConfirm = () => {
-    if (matchMode === 'exact') {
-      if (exactMatched.length === 0) return;
-      onChangeSelected(Array.from(new Set([...selected, ...exactMatched])));
-    } else {
-      if (batchTokens.length === 0) return;
-      onChangeSelected(Array.from(new Set([...selected, ...batchTokens])));
-      const newMeta: Record<string, MatchMode> = {};
-      batchTokens.forEach(t => { newMeta[t] = 'fuzzy'; });
-      setCustomMeta(prev => ({ ...prev, ...newMeta }));
-    }
+    if (exactMatched.length === 0) return;
+    onChangeSelected(Array.from(new Set([...selected, ...exactMatched])));
     setBatchText('');
     setMode('list');
     setTab('selected');
@@ -302,7 +285,6 @@ function ItemPanel({ label, options, selected, onChangeSelected, exclude, onExcl
           ) : (
             displayList.map(opt => {
               const checked = selected.includes(opt);
-              const kind = customMeta[opt];
               return (
                 <div
                   key={opt}
@@ -319,7 +301,6 @@ function ItemPanel({ label, options, selected, onChangeSelected, exclude, onExcl
                     style={{ pointerEvents: 'none', flexShrink: 0 }}
                   />
                   <span style={{ flex: 1, color: checked ? '#1890ff' : '#333' }}>{opt}</span>
-                  {kind && <KindBadge kind={kind} />}
                 </div>
               );
             })
@@ -404,20 +385,13 @@ function ItemPanel({ label, options, selected, onChangeSelected, exclude, onExcl
             <ArrowLeft size={13} color="#1890ff" />
             <span>返回</span>
           </div>
-          <div style={{ flex: 1 }} />
-          <span style={{ fontSize: 12, color: '#999', flexShrink: 0 }}>匹配方式</span>
-          <ModeToggle value={matchMode} onChange={setMatchMode} />
         </div>
 
         <div style={{
-          padding: '5px 12px', fontSize: 12,
-          color: matchMode === 'fuzzy' ? '#7c4dff' : '#999',
-          background: matchMode === 'fuzzy' ? '#f3f0ff' : '#fafafa',
-          borderBottom: '1px solid #f0f0f0', transition: 'all 0.15s',
+          padding: '5px 12px', fontSize: 12, color: '#999',
+          background: '#fafafa', borderBottom: '1px solid #f0f0f0',
         }}>
-          {matchMode === 'exact'
-            ? '仅追加与选项列表精确匹配的值，未命中的将被忽略'
-            : '每个关键字追加后执行包含匹配（LIKE %keyword%），支持自定义值'}
+          仅追加与选项列表精确匹配的值，未命中的将被忽略
         </div>
 
         <div style={{ padding: '10px 12px 0' }}>
@@ -437,7 +411,7 @@ function ItemPanel({ label, options, selected, onChangeSelected, exclude, onExcl
           />
         </div>
 
-        {matchMode === 'exact' && batchTokens.length > 0 && (
+        {batchTokens.length > 0 && (
           <div style={{ padding: '7px 13px 4px', display: 'flex', flexDirection: 'column', gap: 4 }}>
             {exactMatched.length > 0 && (
               <div style={{ fontSize: 12, color: '#52c41a', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -468,47 +442,21 @@ function ItemPanel({ label, options, selected, onChangeSelected, exclude, onExcl
           </div>
         )}
 
-        {matchMode === 'fuzzy' && batchTokens.length > 0 && (
-          <div style={{ padding: '7px 13px 4px' }}>
-            <div style={{ fontSize: 12, color: '#7c4dff', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-              <span>共 {batchTokens.length} 个关键字将以</span>
-              <span style={{
-                display: 'inline-flex', alignItems: 'center',
-                padding: '0 5px', borderRadius: 3,
-                background: '#f9f0ff', color: '#722ed1', border: '1px solid #d3adf7',
-                fontSize: 11, lineHeight: '16px',
-              }}>模糊</span>
-              <span>自定义值追加到已选</span>
-            </div>
-          </div>
-        )}
-
         <div style={{ padding: '10px 12px 12px' }}>
           <Button
             onClick={handleBatchConfirm}
-            disabled={matchMode === 'exact' ? exactMatched.length === 0 : batchTokens.length === 0}
+            disabled={exactMatched.length === 0}
             block
             style={{
-              borderRadius: 6,
-              background: (() => {
-                if (matchMode === 'exact') return exactMatched.length > 0 ? '#1890ff' : '#f0f0f0';
-                return batchTokens.length > 0 ? '#7c4dff' : '#f0f0f0';
-              })(),
-              color: (() => {
-                if (matchMode === 'exact') return exactMatched.length > 0 ? '#fff' : '#bbb';
-                return batchTokens.length > 0 ? '#fff' : '#bbb';
-              })(),
-              border: 'none',
+              borderRadius: 6, border: 'none',
+              background: exactMatched.length > 0 ? '#1890ff' : '#f0f0f0',
+              color: exactMatched.length > 0 ? '#fff' : '#bbb',
               fontSize: 13,
             }}
           >
-            {matchMode === 'exact'
-              ? exactMatched.length > 0
-                ? `追加 ${exactMatched.length} 个匹配项`
-                : batchTokens.length > 0 ? '无可追加项（未命中）' : '请输入内容'
-              : batchTokens.length > 0
-                ? `确认追加 ${batchTokens.length} 个关键字（模糊匹配）`
-                : '请输入内容'}
+            {exactMatched.length > 0
+              ? `追加 ${exactMatched.length} 个匹配项`
+              : batchTokens.length > 0 ? '无可追加项（未命中）' : '请输入内容'}
           </Button>
         </div>
       </>)}
@@ -590,7 +538,11 @@ function PriceRangePanel({ values, onChange, onClose }: PriceRangePanelProps) {
   );
 }
 
-// ── Text-input panel (for accountId / adId etc.) ─────────────────────────────
+// ── Text-input panel (chip style, mirrors AccountInputChip batch panel) ───────
+
+const MAX_INPUT_COUNT = 300;
+
+type TempItem = { value: string; valid: boolean };
 
 interface TextInputPanelProps {
   tabs: SubTypeTab[];
@@ -598,60 +550,63 @@ interface TextInputPanelProps {
   onChangeSelected: (next: string[]) => void;
   exclude: boolean;
   onExcludeChange: (v: boolean) => void;
+  supportFuzzy?: boolean;
+  hideExclude?: boolean;
+  alwaysExclude?: boolean;
+  onCollapse?: () => void;
 }
 
-function TextInputPanel({ tabs, selected, onChangeSelected, exclude, onExcludeChange }: TextInputPanelProps) {
-  const [activeTabIdx, setActiveTabIdx] = useState(0);
-  const activeTab = tabs[activeTabIdx] ?? tabs[0];
+function TextInputPanel({
+  tabs, selected, onChangeSelected, exclude, onExcludeChange,
+  supportFuzzy, hideExclude, alwaysExclude, onCollapse,
+}: TextInputPanelProps) {
+  const label = tabs[0]?.label ?? '';
   const [matchMode, setMatchMode] = useState<MatchMode>('exact');
-  const [inputText, setInputText] = useState('');
-  const [valueMeta, setValueMeta] = useState<Record<string, MatchMode>>({});
-
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [tempItems, setTempItems] = useState<TempItem[]>(() =>
+    selected.map(v => ({ value: v, valid: true }))
+  );
+  const [panelInput, setPanelInput] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setTimeout(() => textareaRef.current?.focus(), 50);
+    setTimeout(() => inputRef.current?.focus(), 50);
   }, []);
 
-  useEffect(() => {
-    if (selected.length === 0) { onExcludeChange(false); setValueMeta({}); }
-  }, [selected.length]);
+  const validItems = tempItems.filter(t => t.valid);
+  const validCount = validItems.length;
 
-  const tokens = useMemo(() => parseTokens(inputText), [inputText]);
-  const newTokens = useMemo(() => tokens.filter(t => !selected.includes(t)), [tokens, selected]);
-  const dupCount = tokens.length - newTokens.length;
-  const canConfirm = newTokens.length > 0;
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (!panelInput.trim()) return;
+    const tokens = parseTokens(panelInput);
+    const existing = new Set(tempItems.map(t => t.value));
+    const newItems = tokens.filter(t => !existing.has(t)).map(t => ({ value: t, valid: true }));
+    setTempItems(prev => [...prev, ...newItems]);
+    setPanelInput('');
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(validItems.map(t => t.value).join('\n'));
+  };
+
+  const handleClearAll = () => {
+    setTempItems([]);
+    setPanelInput('');
+  };
 
   const handleConfirm = () => {
-    if (!canConfirm) return;
-    const merged = [...selected, ...newTokens];
-    onChangeSelected(merged);
-    const meta: Record<string, MatchMode> = {};
-    newTokens.forEach(t => { meta[t] = matchMode; });
-    setValueMeta(prev => ({ ...prev, ...meta }));
-    setInputText('');
-    textareaRef.current?.focus();
+    const values = validItems.slice(0, MAX_INPUT_COUNT).map(t => t.value);
+    onChangeSelected(values);
+    if (alwaysExclude) onExcludeChange(true);
+    onCollapse?.();
   };
 
-  const handleRemove = (v: string) => {
-    onChangeSelected(selected.filter(s => s !== v));
-    setValueMeta(prev => { const n = { ...prev }; delete n[v]; return n; });
+  const handleCancel = () => {
+    onCollapse?.();
   };
 
-  const handleClear = () => {
-    onChangeSelected([]);
-    onExcludeChange(false);
-    setValueMeta({});
-  };
-
-  const handleSwitchTab = (idx: number) => {
-    if (idx === activeTabIdx) return;
-    setActiveTabIdx(idx);
-    onChangeSelected([]);
-    onExcludeChange(false);
-    setValueMeta({});
-    setInputText('');
-  };
+  const overLimit = validCount > MAX_INPUT_COUNT;
 
   return (
     <div
@@ -662,137 +617,154 @@ function TextInputPanel({ tabs, selected, onChangeSelected, exclude, onExcludeCh
       }}
       onClick={e => e.stopPropagation()}
     >
-      {/* Top bar: subType tabs + 精确/模糊 */}
+      {/* Title row */}
       <div style={{
-        display: 'flex', alignItems: 'center',
-        borderBottom: '1px solid #f0f0f0', padding: '0 12px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '9px 12px 0',
       }}>
-        <div style={{ display: 'flex', flex: 1 }}>
-          {tabs.length > 1 ? tabs.map((tab, idx) => {
-            const active = idx === activeTabIdx;
-            return (
-              <div key={tab.key} onClick={() => handleSwitchTab(idx)} style={{
-                padding: '8px 10px 7px', fontSize: 13, cursor: 'pointer',
-                color: active ? '#1890ff' : '#555',
-                borderBottom: active ? '2px solid #1890ff' : '2px solid transparent',
-                fontWeight: active ? 500 : 400,
-                marginBottom: -1, userSelect: 'none', transition: 'color 0.15s',
-              }}>
-                {tab.label}
-              </div>
-            );
-          }) : (
-            <div style={{ padding: '8px 10px 7px', fontSize: 13, color: '#333', fontWeight: 400 }}>
-              {tabs[0].label}
-            </div>
-          )}
-        </div>
-        <ModeToggle value={matchMode} onChange={setMatchMode} />
+        <span style={{ fontSize: 13, fontWeight: 500, color: '#333' }}>{label}</span>
       </div>
 
-      {/* Textarea */}
-      <div style={{ padding: '10px 12px 0' }}>
-        <textarea
-          ref={textareaRef}
-          value={inputText}
-          onChange={e => setInputText(e.target.value)}
-          placeholder={`${activeTab.placeholder}\n每行一个，或用逗号/空格分隔`}
-          rows={4}
-          style={{
-            width: '100%', boxSizing: 'border-box',
-            border: '1px solid #e0e0e0', borderRadius: 6,
-            padding: '8px 10px', fontSize: 12, color: '#333',
-            resize: 'none', outline: 'none', lineHeight: 1.8,
-            fontFamily: F, background: '#fafafa', transition: 'border-color 0.15s',
-          }}
-          onFocus={e => { e.currentTarget.style.borderColor = '#1890ff'; }}
-          onBlur={e => { e.currentTarget.style.borderColor = '#e0e0e0'; }}
-        />
-
-        {/* Parse hint */}
-        <div style={{ minHeight: 20, marginTop: 4, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-          {tokens.length > 0 ? (
-            <>
-              <span style={{ color: '#52c41a' }}>✓ {newTokens.length} 项可添加</span>
-              {dupCount > 0 && <span style={{ color: '#bbb' }}>· {dupCount} 项已存在将跳过</span>}
-              <KindBadge kind={matchMode} />
-            </>
-          ) : (
-            <span style={{ color: '#ccc' }}>支持批量粘贴</span>
+      {/* Info row: 已选(N/300) 复制  |  精准匹配 / 模糊匹配 */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '6px 12px 4px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+          <span style={{ color: '#555' }}>已选({validCount}/{MAX_INPUT_COUNT})</span>
+          {validCount > 0 && (
+            <span
+              onClick={handleCopy}
+              style={{ color: '#1677ff', cursor: 'pointer', userSelect: 'none' }}
+              onMouseEnter={e => (e.currentTarget as HTMLSpanElement).style.opacity = '0.7'}
+              onMouseLeave={e => (e.currentTarget as HTMLSpanElement).style.opacity = '1'}
+            >
+              复制
+            </span>
           )}
         </div>
+        {supportFuzzy ? (
+          <ModeToggle value={matchMode} onChange={v => { setMatchMode(v); setTempItems([]); setPanelInput(''); }} />
+        ) : (
+          <span style={{ fontSize: 12, color: '#ff4d4f' }}>
+            <span style={{ marginRight: 3 }}>ⓘ</span>精准匹配
+          </span>
+        )}
       </div>
 
-      {/* Confirm button */}
-      <div style={{ padding: '6px 12px 0' }}>
-        <Button
-          onClick={handleConfirm}
-          disabled={!canConfirm}
-          block
+      {/* Chip input area */}
+      <div style={{ padding: '0 12px' }}>
+        <div
+          onClick={() => inputRef.current?.focus()}
           style={{
-            borderRadius: 6,
-            border: 'none',
-            background: canConfirm ? (matchMode === 'fuzzy' ? '#7c4dff' : '#1890ff') : '#f0f0f0',
-            color: canConfirm ? '#fff' : '#bbb',
+            minHeight: 100, maxHeight: 180, overflowY: 'auto',
+            border: `1px solid #d9d9d9`,
+            borderRadius: 6, background: '#fafafa',
+            padding: '6px 8px',
+            display: 'flex', flexWrap: 'wrap', alignContent: 'flex-start',
+            gap: 5, cursor: 'text',
           }}
         >
-          {canConfirm
-            ? `添加 ${newTokens.length} 项`
-            : tokens.length > 0 ? '所有值已存在' : '请输入内容'}
-        </Button>
+          {tempItems.map(item => (
+            <span key={item.value} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 3,
+              padding: '1px 7px', borderRadius: 4, fontSize: 12,
+              background: '#f6ffed', color: '#52c41a', border: '1px solid #b7eb8f',
+              lineHeight: '20px', flexShrink: 0,
+            }}>
+              {item.value}
+              <span
+                onMouseDown={e => { e.preventDefault(); e.stopPropagation(); setTempItems(prev => prev.filter(p => p.value !== item.value)); }}
+                style={{ cursor: 'pointer', fontSize: 13, lineHeight: 1, color: '#b7eb8f', marginLeft: 1 }}
+                onMouseEnter={e => (e.currentTarget as HTMLSpanElement).style.color = '#52c41a'}
+                onMouseLeave={e => (e.currentTarget as HTMLSpanElement).style.color = '#b7eb8f'}
+              >×</span>
+            </span>
+          ))}
+          <input
+            ref={inputRef}
+            value={panelInput}
+            onChange={e => setPanelInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={tempItems.length === 0 ? '输入后按回车，支持逗号、空格分隔' : ''}
+            style={{
+              border: 'none', outline: 'none', background: 'transparent',
+              fontSize: 12, color: '#333', lineHeight: '24px',
+              minWidth: 160, flex: 1,
+            }}
+          />
+        </div>
       </div>
 
-      {/* Added list */}
-      {selected.length > 0 && (
-        <>
-          <div style={{
-            padding: '8px 14px 4px',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          }}>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>已添加 {selected.length} 项</Typography.Text>
-            <Typography.Link onClick={handleClear} style={{ fontSize: 12 }}>清空</Typography.Link>
-          </div>
+      {/* Footer: hint | 清空全部  N/300 */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '5px 12px 6px', fontSize: 12,
+      }}>
+        <span style={{ color: '#fa8c16', visibility: panelInput.length > 0 ? 'visible' : 'hidden' }}>
+          输入完成后请按回车
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span
+            onClick={handleClearAll}
+            style={{ color: '#1677ff', cursor: 'pointer', userSelect: 'none' }}
+            onMouseEnter={e => (e.currentTarget as HTMLSpanElement).style.color = '#69b1ff'}
+            onMouseLeave={e => (e.currentTarget as HTMLSpanElement).style.color = '#1677ff'}
+          >
+            清空全部
+          </span>
+          <span style={{ color: overLimit ? '#ff4d4f' : '#999' }}>
+            {validCount}/{MAX_INPUT_COUNT}
+          </span>
+        </div>
+      </div>
 
-          <div style={{ maxHeight: 150, overflowY: 'auto', padding: '0 0 4px' }}>
-            {selected.map(v => (
-              <div
-                key={v}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 14px' }}
-                onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = '#f5f5f5'}
-                onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
-              >
-                <span style={{ flex: 1, fontSize: 12, color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {v}
-                </span>
-                {valueMeta[v] && <KindBadge kind={valueMeta[v]} />}
-                <X size={13} color="#bbb" style={{ cursor: 'pointer', flexShrink: 0 }} onClick={() => handleRemove(v)} />
-              </div>
-            ))}
-          </div>
-
-          {/* 排除 */}
-          <div style={{
-            display: 'flex', alignItems: 'center',
-            padding: '7px 14px 10px',
-            borderTop: '1px solid #f0f0f0', background: '#fafafa',
-          }}>
-            <div
-              onClick={() => onExcludeChange(!exclude)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}
-            >
-              <div style={{
-                width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-                border: `1.5px solid ${exclude ? '#fa8c16' : '#d9d9d9'}`,
-                background: exclude ? '#fa8c16' : '#fff',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.12s',
-              }}>
-                {exclude && <Check size={10} color="#fff" strokeWidth={3} />}
-              </div>
-              <span style={{ fontSize: 12, color: exclude ? '#fa8c16' : '#444' }}>排除</span>
-            </div>
-          </div>
-        </>
+      {/* Warnings */}
+      {overLimit && (
+        <div style={{ padding: '0 12px 6px', fontSize: 12, color: '#ff4d4f' }}>
+          {label}数量已超过最大限制（{MAX_INPUT_COUNT}个），请删减多余项
+        </div>
       )}
+
+      {/* Exclude */}
+      {!hideExclude && (
+        <div style={{
+          display: 'flex', alignItems: 'center',
+          padding: '7px 12px',
+          borderTop: '1px solid #f0f0f0', background: '#fafafa',
+        }}>
+          <div
+            onClick={() => !alwaysExclude && onExcludeChange(!exclude)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: alwaysExclude ? 'default' : 'pointer', userSelect: 'none' }}
+          >
+            <div style={{
+              width: 14, height: 14, borderRadius: 3, flexShrink: 0,
+              border: `1.5px solid ${exclude ? '#fa8c16' : '#d9d9d9'}`,
+              background: exclude ? '#fa8c16' : '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.12s',
+            }}>
+              {exclude && <Check size={10} color="#fff" strokeWidth={3} />}
+            </div>
+            <span style={{ fontSize: 12, color: exclude ? '#fa8c16' : '#444' }}>排除</span>
+          </div>
+        </div>
+      )}
+
+      {/* Buttons */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8,
+        padding: '8px 12px 10px',
+        borderTop: hideExclude ? '1px solid #f0f0f0' : 'none',
+      }}>
+        <Button size="small" onClick={handleCancel} style={{ fontSize: 12 }}>取消</Button>
+        <Button
+          size="small" type="primary" onClick={handleConfirm}
+          disabled={overLimit}
+          style={{ fontSize: 12 }}
+        >
+          确定
+        </Button>
+      </div>
     </div>
   );
 }
@@ -854,7 +826,8 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
       delete nextFilters[key];
       onChangeFilters(nextFilters);
     } else {
-      onChangeFilters({ ...localFilters, [key]: { ...localFilters[key], values: next } });
+      const autoExclude = ALWAYS_EXCLUDE_KEYS.has(key) ? { exclude: true } : {};
+      onChangeFilters({ ...localFilters, [key]: { ...localFilters[key], ...autoExclude, values: next } });
     }
   };
 
@@ -902,7 +875,7 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
                 const selectedValues = localFilters[item.key]?.values || [];
                 const chipData = FILTER_CHIP_DATA[item.key];
                 const isTextInput = TEXT_INPUT_KEYS.has(item.key);
-                const itemExclude = !!localFilters[item.key]?.exclude;
+                const itemExclude = ALWAYS_EXCLUDE_KEYS.has(item.key) ? true : !!localFilters[item.key]?.exclude;
                 const activeColor = itemExclude ? '#fa8c16' : '#1677ff';
                 const chipBg     = itemExclude ? '#fff7e6' : '#e6f4ff';
                 const chipBorder  = itemExclude ? '#ffd591' : '#bae0ff';
@@ -1010,11 +983,15 @@ export function LocalFilterPopover({ localFilters, onChangeFilters, anchorRect, 
                     {expanded && item.key !== 'priceRange' && isTextInput && (
                       <TextInputPanel
                         key={item.key}
-                        tabs={TEXT_INPUT_TABS[item.key] ?? [{ key: 'id', label: item.label, placeholder: `输入${item.label}` }]}
+                        tabs={TEXT_INPUT_TABS[item.key] ?? [{ key: 'id', label: item.label, placeholder: '' }]}
                         selected={selectedValues}
                         onChangeSelected={next => handleChangeItemSelected(item.key, next)}
-                        exclude={itemExclude}
-                        onExcludeChange={v => handleChangeItemExclude(item.key, v)}
+                        exclude={ALWAYS_EXCLUDE_KEYS.has(item.key) ? true : itemExclude}
+                        onExcludeChange={v => !ALWAYS_EXCLUDE_KEYS.has(item.key) && handleChangeItemExclude(item.key, v)}
+                        supportFuzzy={FUZZY_SUPPORT_KEYS.has(item.key)}
+                        hideExclude={HIDE_EXCLUDE_KEYS.has(item.key)}
+                        alwaysExclude={ALWAYS_EXCLUDE_KEYS.has(item.key)}
+                        onCollapse={() => setExpandedKey(null)}
                       />
                     )}
                     {expanded && item.key !== 'priceRange' && !isTextInput && chipData && (

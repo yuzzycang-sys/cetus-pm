@@ -28,17 +28,22 @@ export const FILTER_GROUPS: FilterGroup[] = [
   {
     group: '广告属性',
     items: [
-      { key: 'accountId',       label: '账户ID/名称' },
-      { key: 'projectId',       label: '项目ID/名称' },
-      { key: 'adId',            label: '广告ID/名称' },
-      { key: 'mediaCreativeId', label: '媒体素材ID/名称' },
+      { key: 'accountId',         label: '账户ID' },
+      { key: 'accountName',       label: '账户名称' },
+      { key: 'projectId',         label: '项目ID' },
+      { key: 'projectName',       label: '项目名称' },
+      { key: 'adId',              label: '广告ID' },
+      { key: 'adName',            label: '广告名称' },
+      { key: 'mediaCreativeId',   label: '媒体素材ID' },
+      { key: 'mediaCreativeName', label: '媒体素材名称' },
     ],
   },
   {
     group: '素材信息',
     items: [
-      { key: 'mediaCreativeMd5', label: '媒体素材MD5/名称' },
-      { key: 'creativeName',     label: '素材名称' },
+      { key: 'mediaCreativeMd5',    label: '媒体素材MD5' },
+      { key: 'creativeName',        label: '素材名称' },
+      { key: 'excludeCreativeName', label: '排除素材名称' },
     ],
   },
 ];
