@@ -41,12 +41,12 @@ const DIM_GROUPS: DimGroup[] = [
       { key: 'accountId',        label: '账户ID/名称' },
       { key: 'projectId',        label: '项目ID/名称' },
       { key: 'adId',             label: '广告ID/名称' },
-      { key: 'mediaCreativeId',  label: '媒体素材ID/名称' },
     ],
   },
   {
     group: '素材信息',
     items: [
+      { key: 'mediaCreativeId',  label: '媒体素材ID/名称' },
       { key: 'mediaCreativeMd5', label: '媒体素材MD5/名称' },
       { key: 'creativeName',     label: '素材名称' },
     ],
@@ -66,6 +66,10 @@ const DIM_GROUPS: DimGroup[] = [
     ],
   },
 ];
+
+const CREATIVE_INFO_KEYS = new Set(
+  DIM_GROUPS.find(g => g.group === '素材信息')?.items.map(i => i.key) ?? [],
+);
 
 const SELECTABLE_KEYS = DIM_GROUPS.flatMap(g => g.items.map(i => i.key));
 
@@ -90,6 +94,8 @@ interface Props {
   onApplyDimsToName?: (dims: string[]) => void;
   autoUpdate: boolean;
   onAutoUpdateChange: (v: boolean) => void;
+  showCreativeThumbnail: boolean;
+  onShowCreativeThumbnailChange: (v: boolean) => void;
 }
 
 function ensureTime(dims: string[]): string[] {
@@ -105,6 +111,7 @@ function sortByDefinition(dims: string[]): string[] {
 export function AggregateDimensionPopover({
   activeDims, onChangeDims, onClose, timeGranularity, orderMode, onOrderModeChange,
   onApplyDimsToName, autoUpdate, onAutoUpdateChange,
+  showCreativeThumbnail, onShowCreativeThumbnailChange,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [localDims, setLocalDims] = useState<string[]>(() => ensureTime(activeDims));
@@ -236,26 +243,44 @@ export function AggregateDimensionPopover({
         <div style={{ padding: '12px 16px 4px', width: isCustom ? 600 : 640, flexShrink: 0, maxHeight: 400, overflowY: 'auto' }}>
 
           {/* Selectable dim groups */}
-          {DIM_GROUPS.map((group, gi) => (
-            <div key={group.group} style={{ marginBottom: gi < DIM_GROUPS.length - 1 ? 12 : 0 }}>
-              <div style={{ fontSize: 12, color: '#aaa', marginBottom: 8 }}>{group.group}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px 0' }}>
-                {group.items.map(item => {
-                  const checked = localDims.includes(item.key);
-                  return (
+          {DIM_GROUPS.map((group, gi) => {
+            const isCreativeGroup = group.group === '素材信息';
+            const creativeEnabled = isCreativeGroup
+              ? group.items.some(item => localDims.includes(item.key))
+              : false;
+            return (
+              <div key={group.group} style={{ marginBottom: gi < DIM_GROUPS.length - 1 ? 12 : 0 }}>
+                <div style={{ fontSize: 12, color: '#aaa', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>{group.group}</span>
+                  {isCreativeGroup && (
                     <Checkbox
-                      key={item.key}
-                      checked={checked}
-                      onChange={() => toggleDim(item.key)}
-                      style={{ fontSize: 13 }}
+                      checked={showCreativeThumbnail}
+                      disabled={!creativeEnabled}
+                      onChange={e => onShowCreativeThumbnailChange(e.target.checked)}
+                      style={{ fontSize: 12, color: creativeEnabled ? '#333' : undefined }}
                     >
-                      {item.label}
+                      展示素材缩略图
                     </Checkbox>
-                  );
-                })}
+                  )}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px 0' }}>
+                  {group.items.map(item => {
+                    const checked = localDims.includes(item.key);
+                    return (
+                      <Checkbox
+                        key={item.key}
+                        checked={checked}
+                        onChange={() => toggleDim(item.key)}
+                        style={{ fontSize: 13 }}
+                      >
+                        {item.label}
+                      </Checkbox>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Right: order panel (custom mode only) */}

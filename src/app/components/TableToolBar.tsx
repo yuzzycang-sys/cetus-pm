@@ -28,6 +28,8 @@ interface Props {
   onChangeLocalFilters: (next: LocalFilters) => void;
   dimAutoUpdate: boolean;
   onChangeDimAutoUpdate: (v: boolean) => void;
+  showCreativeThumbnail: boolean;
+  onShowCreativeThumbnailChange: (v: boolean) => void;
   queryDisabled?: boolean;
 }
 
@@ -41,6 +43,7 @@ export function TableToolBar({
   onSelectFilter, onSaveFilter, onDeleteFilter,
   localFilters, onChangeLocalFilters,
   dimAutoUpdate, onChangeDimAutoUpdate,
+  showCreativeThumbnail, onShowCreativeThumbnailChange,
   queryDisabled,
 }: Props) {
   const [showAggDim, setShowAggDim] = useState(false);
@@ -151,6 +154,8 @@ export function TableToolBar({
                 onApplyDimsToName={onApplyDimsToName}
                 autoUpdate={dimAutoUpdate}
                 onAutoUpdateChange={onChangeDimAutoUpdate}
+                showCreativeThumbnail={showCreativeThumbnail}
+                onShowCreativeThumbnailChange={onShowCreativeThumbnailChange}
               />
             )}
           </div>

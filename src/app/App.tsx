@@ -402,6 +402,8 @@ export default function App() {
   // Local filters — temporary, cleared on sheet switch
   const [localFilters, setLocalFilters] = useState<LocalFilters>({});
 
+  const [showCreativeThumbnail, setShowCreativeThumbnail] = useState(false);
+
   // Shared UI state
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [mergeView, setMergeView] = useState(false);
@@ -890,6 +892,8 @@ export default function App() {
                 onChangeLocalFilters={setLocalFilters}
                 dimAutoUpdate={currentSheetState.dimAutoUpdate ?? false}
                 onChangeDimAutoUpdate={v => updateSheetState({ dimAutoUpdate: v })}
+                showCreativeThumbnail={showCreativeThumbnail}
+                onShowCreativeThumbnailChange={setShowCreativeThumbnail}
                 queryDisabled={pageStatus.type === 'NO_PERMISSION'}
               />
 
